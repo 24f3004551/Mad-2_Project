@@ -1,0 +1,115 @@
+{% extends "admin_dashboard.html" %} {% block content %}
+
+<div class="container mt-4">
+  <h2>Doctors</h2>
+  <p>Total no of doctors: {{ doctors|length }}</p>
+  {% if global_doctors %}
+  <form
+    class="d-flex my-2"
+    role="search"
+    method="get"
+    action="{{ url_for('admin_doctors') }}"
+  >
+    <input
+      class="form-control me-2 border border-black w-25"
+      type="search"
+      placeholder="Search"
+      aria-label="Search"
+      name="q"
+    />
+    <button class="btn btn-outline-success" type="submit">Search</button>
+  </form>
+  {% endif %} {% if doctors %}
+
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th scope="col">#</th>
+        <th scope="col">Username</th>
+        <th scope="col">Department</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for doctor in doctors %}
+      <tr>
+        <th scope="row">{{ loop.index }}</th>
+        <td>{{ doctor.username }}</td>
+        <td>
+          {{ doctor.department.name if doctor.department else 'Unassigned' }}
+        </td>
+        <td class="d-flex">
+          <form
+            action="{{ url_for('update_doctor', user_id=doctor.id) }}"
+            method="get"
+            class="mx-2"
+          >
+            <button type="submit" class="btn btn-outline-success">
+              Update
+            </button>
+          </form>
+          <form
+            class="mx-2"
+            action="{{ url_for('blacklist_user', user_id=doctor.id, username=doctor.username) }}"
+            method="post"
+          >
+            {% if doctor.blacklist %}
+            <button type="submit" class="btn btn-warning">
+              Remove Blacklist
+            </button>
+            {% else %}
+            <button type="submit" class="btn btn-warning">Blacklist</button>
+            {% endif %}
+          </form>
+          <form
+            class="mx-2"
+            action="{{ url_for('delete_doctor', user_id=doctor.id) }}"
+            method="post"
+          >
+            <button type="submit" class="btn btn-outline-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  <div class="mt-4">
+    <h2>Add Doctor</h2>
+
+    <form action="/admin/add_doctor" method="POST" class="w-50">
+      <div>
+        <label>Username</label>
+        <input
+          class="form-control border border-black"
+          type="text"
+          name="username"
+        />
+        <label>Password</label>
+        <input
+          class="form-control border border-black"
+          type="password"
+          name="password"
+        />
+      </div>
+
+      {% if departments %}
+      <select
+        class="form-select border border-black mt-4"
+        aria-label="Default select example"
+        name="selected_dept"
+      >
+        <option selected value="">Assign Department</option>
+        {% for dept in departments %}
+        <option value="{{ dept.id }}">{{ dept.name }}</option>
+        {% endfor %}
+      </select>
+
+      {% endif %}
+
+      <button class="btn btn-warning my-3" type="submit">Add Doctor</button>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Doctor Dashboard</title>
+    <style>
+      .flash-message {
+        color: green;
+        animation: fadeIn 0.5s ease-out;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes fadeOut {
+        from {
+          opacity: 1;
+          transform: translateY(0);
+        }
+        to {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+      }
+    </style>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
+      crossorigin="anonymous"
+    />
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg bg-warning">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="{{url_for('doctor_dashboard')}}"
+          >{{ doctor.username }} Dashboard</a
+        >
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navbarNav"
+          aria-controls="navbarNav"
+          aria-expanded="false"
+          aria-label="Toggle navigation"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav me-auto">
+            <li class="nav-item">
+              <a
+                class="nav-link {% if request.endpoint == 'view_profile' %}active{% endif %}"
+                href="{{ url_for('view_profile', user_id=doctor.id) }}"
+              >
+                Profile
+              </a>
+            </li>
+          </ul>
+          <form class="d-flex" method="get" action="{{ url_for('logout') }}">
+            <button class="btn btn-outline-danger" type="submit">Logout</button>
+          </form>
+        </div>
+      </div>
+    </nav>
+    {% with messages = get_flashed_messages(with_categories=true) %} {% if
+    messages %}
+    <div class="container mt-3">
+      {% for category, message in messages %}
+      <div
+        class="alert {% if category == 'success' %} alert-success {% elif category == 'error' %} alert-danger {% elif category == 'warning' %} alert-warning {% else %} alert-info {% endif %} flash-message"
+      >
+        {{ message }}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %} {% endwith %}
+    <div class="container mt-3">
+      {% if request.endpoint == "doctor_dashboard" %}
+      <div>
+        <h2>Today's Pending Appointments</h2>
+        {% if daily_appointments %}
+        <table class="table table-striped">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Patient</th>
+              <th>Doctor</th>
+              <th>Status</th>
+              <th>Treatment</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {% for a in daily_appointments %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ a.date.strftime("%b %d, %Y") }}</td>
+              <td>
+                {% if a.slot == 'slot1' %} 8:00 AM - 9:00 AM {% elif a.slot ==
+                'slot2' %} 9:00 AM - 10: 00 AM {% elif a.slot == 'slot3' %}10:00
+                AM - 11:00 AM {% elif a.slot == 'slot4' %} 1:00 PM - 2:00 PM {%
+                elif a.slot == 'slot5' %} 2:00 PM - 3:00 PM {% else %} 3:00 PM -
+                4:00 PM {% endif %}
+              </td>
+              <td>{{ a.patient.username }}</td>
+
+              <td>
+                {% if a.doctor %} {{ a.doctor.username }} {% else %} Doctor
+                Deleted {% endif %}
+              </td>
+
+              <td>{{ a.status }}</td>
+              <td>
+                {% if a.treatment %}
+                <form action="{{ url_for('give_treatment', appt_id=a.id) }}">
+                  <button class="btn btn-warning">View Treatment</button>
+                </form>
+                {% elif not a.treatment and a.status == 'Booked' %}
+                <form action="{{ url_for('give_treatment', appt_id=a.id) }}">
+                  <button class="btn btn-outline-success">Treat</button>
+                </form>
+                {% else %}None{% endif %}
+              </td>
+
+              {% if a.status == "Booked" %}
+              <td>
+                <form
+                  method="post"
+                  action="{{ url_for('cancel_appointment', appt_id=a.id) }}"
+                >
+                  <button class="btn btn-outline-danger">Cancel</button>
+                </form>
+              </td>
+              {% endif %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p>No Appointment for today!!!</p>
+        {% endif %}
+      </div>
+      <h2>Assigned Patients</h2>
+      {% if assigned_patients %}
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Patient Name</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in assigned_patients %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ p.username }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p>No assigned patients yet.</p>
+      {% endif %}
+      <h2>All Appointments</h2>
+      {% if doctor.appointments_as_doctor %}
+      <table class="table table-striped">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Patient</th>
+            <th>Doctor</th>
+            <th>Status</th>
+            <th>Treatment</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for a in doctor.appointments_as_doctor %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ a.date.strftime("%b %d, %Y") }}</td>
+            <td>
+              {% if a.slot == 'slot1' %} 8:00 AM - 9:00 AM {% elif a.slot ==
+              'slot2' %} 9:00 AM - 10: 00 AM {% elif a.slot == 'slot3' %}10:00
+              AM - 11:00 AM {% elif a.slot == 'slot4' %} 1:00 PM - 2:00 PM {%
+              elif a.slot == 'slot5' %} 2:00 PM - 3:00 PM {% else %} 3:00 PM -
+              4:00 PM {% endif %}
+            </td>
+            <td>{{ a.patient.username }}</td>
+
+            <td>
+              {% if a.doctor %} {{ a.doctor.username }} {% else %} Doctor
+              Deleted {% endif %}
+            </td>
+
+            <td>{{ a.status }}</td>
+            <td>
+              {% if a.treatment %}
+              <form action="{{ url_for('give_treatment', appt_id=a.id) }}">
+                <button class="btn btn-warning">View Treatment</button>
+              </form>
+              {% elif not a.treatment and a.status == 'Booked' %}
+              <form action="{{ url_for('give_treatment', appt_id=a.id) }}">
+                <button class="btn btn-outline-success">Treat</button>
+              </form>
+              {% else %}None{% endif %}
+            </td>
+
+            {% if a.status == "Booked" %}
+            <td>
+              <form
+                method="post"
+                action="{{ url_for('cancel_appointment', appt_id=a.id) }}"
+              >
+                <button class="btn btn-outline-danger">Cancel</button>
+              </form>
+            </td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p>No appointments at all</p>
+      {% endif %}
+
+      <a href="/doctor_availability"
+        ><button class="btn btn-warning my-2">Update Availability</button></a
+      >
+      {% endif %} {% block content %}{% endblock %}
+    </div>
+    <script>
+      setTimeout(() => {
+        const flash = document.querySelector(".flash-message");
+        if (flash) {
+          flash.style.animation = "fadeOut 0.5s ease-out forwards";
+          setTimeout(() => {
+            flash.remove();
+          }, 500);
+        }
+      }, 2000);
+    </script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
+      crossorigin="anonymous"
+    ></script>
+  </body>
+</html>

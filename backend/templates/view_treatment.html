@@ -1,0 +1,92 @@
+{% extends layout %} {% block content %}
+
+<style>
+  textarea {
+    height: 100px;
+  }
+</style>
+
+<div class="container mt-4 d-flex flex-column">
+  <h2 class="d-flex justify-content-center">
+    Treatment for {{ appt.patient.username }}
+  </h2>
+  <div>
+    <div class="mb-3 d-flex flex-column">
+      <div>{{ appt.date }}</div>
+      <div>Patient Name: {{ appt.patient.username }}</div>
+      <div>
+        Doctor Name: {% if appt.doctor %}{{ appt.doctor.username }}{% else
+        %}Doctor Deleted {% endif %}
+      </div>
+    </div>
+    <hr />
+    <div class="mb-3">
+      <h4>Diagnosis</h4>
+      <div name="diagnosis">{{ appt.treatment.diagnosis }}</div>
+    </div>
+
+    {% if appt.treatment.prescription %}
+    <div class="mb-3">
+      <h4>Prescription</h4>
+      <div name="prescription">{{ appt.treatment.prescription }}</div>
+    </div>
+    {% endif %} {% if appt.treatment.notes %}
+    <div class="mb-3">
+      <h4>Notes</h4>
+      <div name="notes">{{ appt.treatment.notes }}</div>
+    </div>
+    {% endif %}
+    <a
+      href="{{ url_for('patient_dashboard') }}"
+      class="btn btn-outline-danger ms-2"
+      >Go Back</a
+    >
+  </div>
+  <h2 class="my-lg-4">Past History</h2>
+  {% if not past_history %}
+  <p>No Past History</p>
+  {% endif %}
+
+  <div class="d-flex flex-row flex-wrap gap-4">
+    {% if past_history %} {% for past_appt in past_history %} {% if past_appt.id
+    != appt.id %}
+
+    <div
+      class="card border border-black mb-lg-4"
+      style="width: 25%; max-height: 400px; overflow: hidden"
+    >
+      <div class="card-body d-flex flex-column overflow-auto">
+        <h5 class="card-title">{{ past_appt.date }}</h5>
+        <h6 class="card-subtitle mb-2 text-body-secondary">
+          Patient Name: {{ past_appt.patient.username }}
+        </h6>
+        {% if past_appt.doctor %}
+        <h6 class="card-subtitle mb-2 text-body-secondary">
+          Doctor Name: {{ past_appt.doctor.username }}
+        </h6>
+        {% endif %}
+
+        <div class="mb-3">
+          <h4>Diagnosis</h4>
+          <div name="diagnosis">{{ past_appt.treatment.diagnosis }}</div>
+        </div>
+
+        {% if past_appt.treatment.prescription %}
+        <div class="mb-3">
+          <h4>Prescription</h4>
+          <div name="prescription">{{ past_appt.treatment.prescription }}</div>
+        </div>
+        {% endif %} {% if past_appt.treatment.notes %}
+        <div class="mb-3">
+          <h4>Notes</h4>
+          <div name="notes">{{ past_appt.treatment.notes }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {% endif %} {% endfor %} {% endif %}
+  </div>
+</div>
+
+{% endblock %}

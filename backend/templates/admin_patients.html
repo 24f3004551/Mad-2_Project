@@ -1,0 +1,65 @@
+{% extends "admin_dashboard.html" %} {% block content %}
+
+<div class="container mt-4">
+  <h2>Patients</h2>
+  <p>Total no of patients: {{ patients|length }}</p>
+  {% if global_patients %}
+  <form
+    class="d-flex my-2"
+    role="search"
+    method="get"
+    action="{{ url_for('admin_patients') }}"
+  >
+    <input
+      class="form-control me-2 border border-black w-25"
+      type="search"
+      placeholder="Search"
+      aria-label="Search"
+      name="q"
+    />
+    <button class="btn btn-outline-success" type="submit">Search</button>
+  </form>
+  {% endif %} {% if patients %}
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Username</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {% for p in patients %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ p.username }}</td>
+        <td class="d-flex">
+          <form
+            class="mx-2"
+            action="{{ url_for('blacklist_user', user_id=p.id, username=p.username) }}"
+            method="post"
+          >
+            {% if p.blacklist %}
+            <button type="submit" class="btn btn-warning">
+              Remove Blacklist
+            </button>
+            {% else %}
+            <button type="submit" class="btn btn-warning">Blacklist</button>
+            {% endif %}
+          </form>
+          <form
+            class="mx-2"
+            action="{{ url_for('delete_patient', user_id=p.id) }}"
+            method="post"
+          >
+            <button type="submit" class="btn btn-outline-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+
+{% endblock %}

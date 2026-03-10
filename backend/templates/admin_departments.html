@@ -1,0 +1,85 @@
+{% extends "admin_dashboard.html" %} {% block content %}
+
+<div class="container mt-4">
+  <h2>Departments</h2>
+  <p>Total no of Departments: {{ departments|length }}</p>
+
+  {% if departments %}
+  <table class="table">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for dept in departments %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ dept.name }}</td>
+        <td>{{ dept.description }}</td>
+        <td class="d-flex">
+          <form
+            class="mx-2"
+            method="get"
+            action="{{ url_for('update_department', dept_id=dept.id) }}"
+          >
+            <button class="btn btn-outline-success">Update</button>
+          </form>
+          <form
+            method="post"
+            action="{{ url_for('delete_department', dept_id=dept.id) }}"
+          >
+            <button class="btn btn-outline-danger">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+  <div class="mt-5">
+    <h2>Add Department</h2>
+
+    <form action="/admin/add_department" method="POST" class="w-50">
+      <div>
+        <label class="my-2">Department Name</label>
+        <input
+          class="form-control border border-black"
+          type="text"
+          name="dept_name"
+        />
+        <label class="my-2">Department Description</label>
+        <input
+          class="form-control border border-black"
+          type="text"
+          name="description"
+        />
+      </div>
+      <div class="">
+        <label class="my-2">Assign Doctors</label>
+        <div class="mb-2">
+          {% for doctor in doctors_with_no_dept %}
+          <div class="form-check">
+            <input
+              class="form-check-input border border-black"
+              type="checkbox"
+              name="doctor_ids"
+              value="{{ doctor.id }}"
+              id="doc{{ doctor.id }}"
+            />
+            <label class="form-check-label" for="doc{{ doctor.id }}">
+              {{ doctor.username }}
+            </label>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <button class="btn btn-warning mb-3" type="submit">Add Department</button>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

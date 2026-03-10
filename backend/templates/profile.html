@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Profile</title>
+    <style>
+      .flash-message {
+        color: green;
+        animation: fadeIn 0.5s ease-out;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes fadeOut {
+        from {
+          opacity: 1;
+          transform: translateY(0);
+        }
+        to {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+      }
+    </style>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
+      crossorigin="anonymous"
+    />
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg bg-warning">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="{{url_for('dashboard')}}"
+          >{{ user.username }} Dashboard</a
+        >
+        <button
+          class="navbar-toggler"
+          type="button"
+          data-bs-toggle="collapse"
+          data-bs-target="#navbarNav"
+          aria-controls="navbarNav"
+          aria-expanded="false"
+          aria-label="Toggle navigation"
+        >
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav me-auto">
+            <li class="nav-item">
+              <a
+                class="nav-link {% if request.endpoint == 'view_profile' %}active{% endif %}"
+                href="{{ url_for('view_profile', user_id=user.id) }}"
+              >
+                Profile
+              </a>
+            </li>
+            {% if user.role == 'patient' %}
+            <li class="nav-item">
+              <a
+                class="nav-link {% if request.endpoint == 'view_departments' %}active{% endif %}"
+                href="{{ url_for('view_departments') }}"
+              >
+                Departments
+              </a>
+            </li>
+            {% endif %}
+          </ul>
+          <form class="d-flex" method="get" action="{{ url_for('logout') }}">
+            <button class="btn btn-outline-danger" type="submit">Logout</button>
+          </form>
+        </div>
+      </div>
+    </nav>
+    {% with messages = get_flashed_messages(with_categories=true) %} {% if
+    messages %}
+    <div class="container mt-3">
+      {% for category, message in messages %}
+      <div
+        class="alert {% if category == 'success' %} alert-success {% elif category == 'error' %} alert-danger {% elif category == 'info' %} alert-warning {% else %} alert-info {% endif %} flash-message"
+      >
+        {{ message }}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %} {% endwith %}
+    <div class="container d-flex flex-column justify-content-center w-50">
+      <h2 class="my-5">{{user.username}} Profile</h2>
+      <form method="post">
+        <div class="mb-3">
+          <label>Username</label>
+          <input
+            class="form-control border border-black"
+            type="text"
+            name="username"
+            value="{{user.username}}"
+          />
+          <label>Password</label>
+          <input
+            class="form-control border border-black"
+            type="password"
+            name="password"
+          />
+        </div>
+        <button type="submit" class="btn btn-warning">Submit</button>
+      </form>
+    </div>
+
+    <script>
+      setTimeout(() => {
+        const flash = document.querySelector(".flash-message");
+        if (flash) {
+          flash.style.animation = "fadeOut 0.5s ease-out forwards";
+          setTimeout(() => {
+            flash.remove();
+          }, 500);
+        }
+      }, 2000);
+    </script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"
+      integrity="sha384-FKyoEForCGlyvwx9Hj09JcYn3nv7wiPVlz7YYwJrWVcXK/BmnVDxM+D2scQbITxI"
+      crossorigin="anonymous"
+    ></script>
+  </body>
+</html>

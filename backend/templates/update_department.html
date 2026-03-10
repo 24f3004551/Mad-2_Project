@@ -1,0 +1,33 @@
+{% extends "admin_dashboard.html" %} {% block content %}
+
+<div class="container mt-4">
+  <h2>Update Department</h2>
+
+  <form
+    action="{{ url_for('update_department', dept_id=dept.id) }}"
+    method="POST"
+    class="w-50"
+  >
+    <label class="my-2">Name</label>
+    <input
+      class="form-control mb-2 border border-black"
+      name="name"
+      value="{{ dept.name }}"
+    />
+
+    <label class="my-2">Description</label>
+    <textarea class="form-control mb-3 border border-black" name="description">
+      {{ dept.description }}
+    </textarea>
+
+    <button class="btn btn-warning">Save</button>
+    <a
+      href="{{ url_for('admin_departments') }}"
+      class="btn btn-outline-danger ms-2"
+    >
+      Cancel
+    </a>
+  </form>
+</div>
+
+{% endblock %}

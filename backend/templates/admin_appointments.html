@@ -1,0 +1,73 @@
+{% extends "admin_dashboard.html" %} {% block content %}
+
+<div class="container mt-4">
+  <h2>Appointments</h2>
+  <p>Total no of appointments: {{appointments|length}}</p>
+
+  {% if appointments %}
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Date</th>
+        <th>Time</th>
+        <th>Patient</th>
+        <th>Doctor</th>
+        <th>Status</th>
+        <th>Treatment</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {% for a in appointments %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td>{{ a.date.strftime("%b %d, %Y") }}</td>
+        <td>
+          {% if a.slot == 'slot1' %} 8:00 AM - 9:00 AM {% elif a.slot == 'slot2'
+          %} 9:00 AM - 10: 00 AM {% elif a.slot == 'slot3' %}10:00 AM - 11:00 AM
+          {% elif a.slot == 'slot4' %} 1:00 PM - 2:00 PM {% elif a.slot ==
+          'slot5' %} 2:00 PM - 3:00 PM {% else %} 3:00 PM - 4:00 PM {% endif %}
+        </td>
+        <td>{{ a.patient.username }}</td>
+
+        <td>
+          {% if a.doctor %} {{ a.doctor.username }} {% else %} Doctor Deleted {%
+          endif %}
+        </td>
+
+        <td>{{ a.status }}</td>
+        <td>
+          {% if a.treatment %}
+          <form action="{{ url_for('view_treatment', appt_id=a.id) }}">
+            <button class="btn btn-warning">View Treatment</button>
+          </form>
+          {% else %}None{% endif %}
+        </td>
+        {% if a.status == "Booked" %}
+        <td>
+          <form
+            method="post"
+            action="{{ url_for('cancel_appointment', appt_id=a.id) }}"
+          >
+            <button class="btn btn-outline-danger">Cancel</button>
+          </form>
+        </td>
+        {% elif a.status == "Cancelled" %}
+        <td>
+          <form
+            method="post"
+            action="{{ url_for('delete_appointment', appt_id=a.id) }}"
+          >
+            <button class="btn btn-outline-danger">Delete</button>
+          </form>
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+
+{% endblock %}

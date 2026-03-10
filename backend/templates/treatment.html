@@ -1,0 +1,94 @@
+{% extends "doctor_dashboard.html" %} {% block content %}
+
+<style>
+  textarea {
+    height: 100px;
+  }
+</style>
+
+<div class="container mt-4">
+  <h2>Treatment for {{ appt.patient.username }}</h2>
+  <form
+    action="{{ url_for('give_treatment', appt_id=appt.id) }}"
+    method="POST"
+    class="w-50"
+  >
+    <div class="mb-3">
+      <label class="form-label">Diagnosis</label>
+      <textarea name="diagnosis" class="form-control border border-black">
+{{ appt.treatment.diagnosis }}
+      </textarea>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Prescription</label>
+      <textarea
+        name="prescription"
+        class="form-control border border-black textarea"
+      >
+{{ appt.treatment.prescription }}</textarea
+      >
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Notes</label>
+      <textarea name="notes" class="form-control border border-black">
+{{ appt.treatment.notes }}</textarea
+      >
+    </div>
+
+    <button class="btn btn-warning" type="submit">Save Changes</button>
+    <a
+      href="{{ url_for('doctor_dashboard') }}"
+      class="btn btn-outline-danger ms-2"
+      >Cancel</a
+    >
+  </form>
+  <h2 class="my-lg-4">Past History</h2>
+  {% if not past_history %}
+  <p>No Past History</p>
+  {% endif %}
+
+  <div class="d-flex flex-row flex-wrap gap-4">
+    {% if past_history %} {% for past_appt in past_history %} {% if past_appt.id
+    != appt.id %}
+
+    <div
+      class="card border border-black mb-lg-4"
+      style="width: 25%; max-height: 400px; overflow: hidden"
+    >
+      <div class="card-body d-flex flex-column overflow-auto">
+        <h5 class="card-title">{{ past_appt.date }}</h5>
+        <h6 class="card-subtitle mb-2 text-body-secondary">
+          Patient Name: {{ past_appt.patient.username }}
+        </h6>
+        {% if past_appt.doctor %}
+        <h6 class="card-subtitle mb-2 text-body-secondary">
+          Doctor Name: {{ past_appt.doctor.username }}
+        </h6>
+        {% endif %}
+
+        <div class="mb-3">
+          <h4>Diagnosis</h4>
+          <div name="diagnosis">{{ past_appt.treatment.diagnosis }}</div>
+        </div>
+
+        {% if past_appt.treatment.prescription %}
+        <div class="mb-3">
+          <h4>Prescription</h4>
+          <div name="prescription">{{ past_appt.treatment.prescription }}</div>
+        </div>
+        {% endif %} {% if past_appt.treatment.notes %}
+        <div class="mb-3">
+          <h4>Notes</h4>
+          <div name="notes">{{ past_appt.treatment.notes }}</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {% endif %} {% endfor %} {% endif %}
+  </div>
+</div>
+
+{% endblock %}

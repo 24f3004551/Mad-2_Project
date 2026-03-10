@@ -1,0 +1,101 @@
+{% extends "doctor_dashboard.html" %} {% block content %}
+<style>
+  .slot-box {
+    padding: 10px;
+    margin: 5px;
+    border: 2px solid;
+    cursor: pointer;
+  }
+
+  .available {
+    border-color: green;
+    color: green;
+  }
+
+  .booked {
+    border-color: blue;
+    color: blue;
+  }
+
+  .unavailable {
+    border-color: red;
+    color: red;
+  }
+</style>
+<div class="container mt-4">
+  <h2>Doctor's Availability</h2>
+
+  <form method="POST" , action="">
+    {% for day in days %}
+    <div class="day-row">
+      {% if not (day == today and curr_time > time(17,0)) %}
+      <div class="date-box">{{ day.strftime("%d-%m-%Y") }}</div>
+      {% endif %}
+      <!--SLOT_1-->
+      {% if not (day == today and curr_time > time(8,0)) %}
+      <label
+        class="slot-box {% if avail.get((day, 'slot1')) %} {% if avail.get((day, 'slot1')).booked %} booked {% elif avail.get((day, 'slot1')).available %} available {% else %} unavailable {% endif %} {% else %} unavailable {% endif %}"
+      >
+        <input type="checkbox" name="slot_{{day}}_slot1" {% if
+        avail.get((day,'slot1')).available %}checked{% endif %}> {{
+        slots['slot1'] }}
+      </label>
+      {% endif %}
+      <!--SLOT_2-->
+      {% if not (day == today and curr_time > time(9,0)) %}
+      <label
+        class="slot-box {% if avail.get((day, 'slot2')) %} {% if avail.get((day, 'slot2')).booked %} booked {% elif avail.get((day, 'slot2')).available %} available {% else %} unavailable {% endif %} {% else %} unavailable {% endif %}"
+      >
+        <input type="checkbox" name="slot_{{day}}_slot2" {% if
+        avail.get((day,'slot2')).available %}checked{% endif %}> {{
+        slots['slot2'] }}
+      </label>
+      {% endif %}
+      <!--SLOT_3-->
+      {% if not (day == today and curr_time > time(10,0)) %}
+      <label
+        class="slot-box {% if avail.get((day, 'slot3')) %} {% if avail.get((day, 'slot3')).booked %} booked {% elif avail.get((day, 'slot3')).available %} available {% else %} unavailable {% endif %} {% else %} unavailable {% endif %}"
+      >
+        <input type="checkbox" name="slot_{{day}}_slot3" {% if
+        avail.get((day,'slot3')).available %}checked{% endif %}> {{
+        slots['slot3'] }}
+      </label>
+      {% endif %}
+      <!--SLOT_4-->
+      {% if not (day == today and curr_time > time(13,0)) %}
+      <label
+        class="slot-box {% if avail.get((day, 'slot4')) %} {% if avail.get((day, 'slot4')).booked %} booked {% elif avail.get((day, 'slot4')).available %} available {% else %} unavailable {% endif %} {% else %} unavailable {% endif %}"
+      >
+        <input type="checkbox" name="slot_{{day}}_slot4" {% if
+        avail.get((day,'slot4')).available %}checked{% endif %}> {{
+        slots['slot4'] }}
+      </label>
+      {% endif %}
+      <!--SLOT_5-->
+      {% if not (day == today and curr_time > time(14,0)) %}
+      <label
+        class="slot-box {% if avail.get((day, 'slot5')) %} {% if avail.get((day, 'slot5')).booked %} booked {% elif avail.get((day, 'slot5')).available %} available {% else %} unavailable {% endif %} {% else %} unavailable {% endif %}"
+      >
+        <input type="checkbox" name="slot_{{day}}_slot5" {% if
+        avail.get((day,'slot5')).available %}checked{% endif %}> {{
+        slots['slot5'] }}
+      </label>
+      {% endif %}
+
+      <!--SLOT_6-->
+      {% if not (day == today and curr_time > time(15,0)) %}
+      <label
+        class="slot-box {% if avail.get((day, 'slot6')) %} {% if avail.get((day, 'slot6')).booked %} booked {% elif avail.get((day, 'slot6')).available %} available {% else %} unavailable {% endif %} {% else %} unavailable {% endif %}"
+      >
+        <input type="checkbox" name="slot_{{day}}_slot6" {% if
+        avail.get((day,'slot6')).available %}checked{% endif %}> {{
+        slots['slot6'] }}
+      </label>
+      {% endif %}
+    </div>
+    {% endfor %}
+
+    <button type="submit" class="btn btn-warning my-2">Save</button>
+  </form>
+</div>
+{% endblock %}

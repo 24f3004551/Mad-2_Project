@@ -1,0 +1,118 @@
+{% extends "patient_dashboard.html" %} {% block content %}
+
+<style>
+  .unavailable {
+    display: none;
+  }
+  .available {
+    border-color: green;
+    color: green;
+  }
+  .slot-box {
+    padding: 10px;
+    margin: 5px;
+    border: 2px solid;
+    cursor: pointer;
+  }
+  .no-slot {
+    padding: 10px;
+    margin: 5px;
+    border: 2px solid;
+    border-color: red;
+    color: red;
+  }
+</style>
+
+<div class="container mt-4">
+  <h2>Doctor's Upcoming Availability</h2>
+  {% if grouped %}
+  <form method="POST" , action="">
+    {% for day, slot_data in grouped.items() %}
+    <div class="day-">
+      {% if (day == today and curr_time < time(15,0)) or day > today %}
+      <div class="date-box">{{ day.strftime("%d-%m-%Y") }}</div>
+      {% endif %}
+      <!--SLOT_1-->
+      {% if (day == today and curr_time < time(8,0)) or day > today %} {% if
+      slot_data.get('slot1') %}
+      <label
+        class="slot-box {{ 'available' if slot_data.get('slot1') else 'unavailable' }}"
+      >
+        <input type="radio" name="selected_slot" value="{{ day }}|slot1" />
+        {{ slots['slot1'] }}
+      </label>
+      {% else %}
+      <label class="no-slot">No Slot</label>
+      {% endif %} {% endif %}
+      <!--SLOT_2-->
+      {% if (day == today and curr_time < time(9,0)) or day > today %} {% if
+      slot_data.get('slot2') %}
+      <label
+        class="slot-box {{ 'available' if slot_data.get('slot2') else 'unavailable' }}"
+      >
+        <input type="radio" name="selected_slot" value="{{ day }}|slot2" />
+        {{ slots['slot2'] }}
+      </label>
+      {% else %}
+      <label class="no-slot">No Slot</label>
+      {% endif %} {% endif %}
+      <!--SLOT_3-->
+      {% if (day == today and curr_time < time(10,0)) or day > today %} {% if
+      slot_data.get('slot3') %}
+      <label
+        class="slot-box {{ 'available' if slot_data.get('slot3') else 'unavailable' }}"
+      >
+        <input type="radio" name="selected_slot" value="{{ day }}|slot3" />
+        {{ slots['slot3'] }}
+      </label>
+      {% else %}
+      <label class="no-slot">No Slot</label>
+      {% endif %} {% endif %}
+      <!--SLOT_4-->
+      {% if (day == today and curr_time < time(13,0)) or day > today %} {% if
+      slot_data.get('slot4') %}
+      <label
+        class="slot-box {{ 'available' if slot_data.get('slot4') else 'unavailable' }}"
+      >
+        <input type="radio" name="selected_slot" value="{{ day }}|slot4" />
+        {{ slots['slot4'] }}
+      </label>
+      {% else %}
+      <label class="no-slot">No Slot</label>
+      {% endif %} {% endif %}
+      <!--SLOT_5-->
+      {% if (day == today and curr_time < time(14,0)) or day > today %} {% if
+      slot_data.get('slot5') %}
+      <label
+        class="slot-box {{ 'available' if slot_data.get('slot5') else 'unavailable' }}"
+      >
+        <input type="radio" name="selected_slot" value="{{ day }}|slot5" />
+        {{ slots['slot5'] }}
+      </label>
+      {% else %}
+      <label class="no-slot">No Slot</label>
+      {% endif %} {% endif %}
+
+      <!--SLOT_6-->
+      {% if (day == today and curr_time < time(15,0)) or day > today %} {% if
+      slot_data.get('slot6') %}
+      <label
+        class="slot-box {{ 'available' if slot_data.get('slot6') else 'unavailable' }}"
+      >
+        <input type="radio" name="selected_slot" value="{{ day }}|slot6" />
+        {{slots['slot6'] }}
+      </label>
+      {% else %}
+      <label class="no-slot">No Slot</label>
+      {% endif %} {% endif %}
+    </div>
+    {% endfor %}
+
+    <button type="submit" class="btn btn-warning my-2">Save</button>
+  </form>
+  {% else %}
+  <p class="text-muted">No availability for this doctor at the moment.</p>
+  {% endif %}
+</div>
+
+{% endblock %}
