@@ -1,0 +1,22 @@
+# Python / Flask
+__pycache__/
+*.pyc
+instance/
+venv/
+.env
+
+# SQLite database
+*.db
+*.sqlite3
+
+# Node / Vue
+node_modules/
+dist/
+.env.local
+.env.production
+
+# Redis cache
+dump.rdb
+
+# VS Code
+.vscode/
