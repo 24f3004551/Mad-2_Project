@@ -1,15 +1,35 @@
-from flask import Flask, render_template, request, redirect, session, flash, url_for
+from flask import (
+    Flask,
+    render_template,
+    request,
+    redirect,
+    session,
+    flash,
+    url_for,
+    jsonify,
+)
+from flask_jwt_extended import (
+    JWTManager,
+    jwt_required,
+    create_access_token,
+    get_jwt_identity,
+    get_jwt,
+)
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta, time
 import os
 from dotenv import load_dotenv
+from flask_cors import CORS
 
 load_dotenv()
 
 app = Flask(__name__, template_folder="templates")
+CORS(app)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///hospital.db"
-app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
+# app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
+app.config["JWT_SECRET_KEY"] = "mypersonaljwtsecretkeyformyhospitalapplication"
+jwt = JWTManager(app)
 db = SQLAlchemy(app)
 
 
@@ -105,160 +125,200 @@ class Treatment(db.Model):
 
 
 # ---------------------Routes-----------------------------------
-@app.route("/")
-def dashboard():
-    if "user_id" not in session:
-        return redirect("/login")
+# @app.route("/")
+# def dashboard():
+#     if "user_id" not in session:
+#         return redirect("/login")
 
-    role = session.get("role")
+#     role = session.get("role")
 
-    if role == "admin":
-        return redirect("/admin_dashboard")
-    elif role == "patient":
-        return redirect(url_for("patient_dashboard"))
-    elif role == "doctor":
-        return redirect("/doctor_dashboard")
-    else:
-        session.clear()
-        return redirect("/login")
+#     if role == "admin":
+#         return redirect("/admin_dashboard")
+#     elif role == "patient":
+#         return redirect(url_for("patient_dashboard"))
+#     elif role == "doctor":
+#         return redirect("/doctor_dashboard")
+#     else:
+#         session.clear()
+#         return redirect("/login")
 
 
 # --------------------Admin Routes-------------------------------------------
-@app.route("/admin_dashboard", methods=["GET", "POST"])
+@app.route("/admin_dashboard", methods=["GET"])
+@jwt_required()
 def admin_dashboard():
-    if "user_id" not in session or session["role"] != "admin":
-        return redirect("/")
-    if request.method == "GET":
-        doctors = User.query.filter_by(role="doctor").all()
-        patients = User.query.filter_by(role="patient").all()
-        departments = Department.query.all()
-        appointments = Appointment.query.all()
-        return render_template(
-            "admin_dashboard.html",
-            doctors=doctors,
-            patients=patients,
-            departments=departments,
-            appointments=appointments,
-        )
+    claims = get_jwt()
+
+    if claims.get("role") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    doctors = User.query.filter_by(role="doctor").all()
+    patients = User.query.filter_by(role="patient").all()
+    departments = Department.query.all()
+    appointments = Appointment.query.all()
+    return jsonify(
+        {
+            "doctors": [
+                {
+                    "id": d.id,
+                    "username": d.username,
+                    "blacklist": d.blacklist,
+                    "department_id": d.department_id,
+                }
+                for d in doctors
+            ],
+            "patients": [
+                {"id": p.id, "username": p.username, "blacklist": p.blacklist}
+                for p in patients
+            ],
+            "departments": [
+                {
+                    "id": dept.id,
+                    "name": dept.name,
+                    "description": dept.description,
+                    "doctors": [
+                        {"id": doc.id, "username": doc.username} for doc in dept.doctors
+                    ],
+                }
+                for dept in departments
+            ],
+            "appointments": [
+                {
+                    "id": a.id,
+                    "date": str(a.date),
+                    "slot": a.slot,
+                    "status": a.status,
+                    "patient": (
+                        {"id": a.patient.id, "username": a.patient.username}
+                        if a.patient
+                        else None
+                    ),
+                    "doctor": (
+                        {"id": a.doctor.id, "username": a.doctor.username}
+                        if a.doctor
+                        else None
+                    ),
+                }
+                for a in appointments
+            ],
+        }
+    )
 
 
 @app.route("/admin_doctors", methods=["GET"])
+@jwt_required()
 def admin_doctors():
-    if "user_id" not in session or session["role"] != "admin":
-        return redirect("/")
-    if request.method == "GET":
-        search_term = request.args.get("q", "").strip()
-        if search_term:
-            doctors = User.query.filter_by(role="doctor")
+    claims = get_jwt()
 
-            doctors = doctors.join(Department)
+    if claims.get("role") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
 
-            doctors = doctors.filter(
+    search_term = request.args.get("q", "").strip()
+
+    if search_term:
+        doctors = (
+            User.query.filter_by(role="doctor")
+            .outerjoin(Department)
+            .filter(
                 (User.username.like(f"%{search_term}%"))
                 | (Department.name.like(f"%{search_term}%"))
-            ).all()
-
-        else:
-            doctors = User.query.filter_by(role="doctor").all()
-        departments = Department.query.all()
-        global_doctors = User.query.filter_by(role="doctor").all()
-        return render_template(
-            "admin_doctors.html",
-            doctors=doctors,
-            departments=departments,
-            global_doctors=global_doctors,
+            )
+            .all()
         )
+    else:
+        doctors = User.query.filter_by(role="doctor").all()
+
+    departments = Department.query.all()
+
+    return jsonify(
+        {
+            "doctors": [
+                {
+                    "id": d.id,
+                    "username": d.username,
+                    "department": d.department.name if d.department else None,
+                    "blacklist": d.blacklist,
+                }
+                for d in doctors
+            ],
+            "departments": [{"id": dept.id, "name": dept.name} for dept in departments],
+        }
+    )
 
 
 @app.route("/admin/add_doctor", methods=["POST"])
+@jwt_required()
 def add_doctor():
-    if "user_id" not in session or session["role"] != "admin":
-        return redirect("/")
-    username = request.form.get("username", "")
-    password = request.form.get("password", "")
-    dept = request.form.get("selected_dept", "")
+    claims = get_jwt()
 
-    if username == "" or password == "":
-        flash("Please provide username and password", "error")
-        return redirect("/admin_doctors")
+    if claims.get("role") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
 
-    doctorExist = User.query.filter_by(username=username).first()
+    data = request.get_json()
 
-    if doctorExist:
-        flash("A user with this username already exist.", "error")
-        return redirect("/admin_doctors")
+    username = data.get("username")
+    password = data.get("password")
+    dept_id = data.get("department_id")
 
-    if dept == "":
-        new_doctor = User(
-            username=username, password=generate_password_hash(password), role="doctor"
-        )
-    else:
-        new_doctor = User(
-            username=username,
-            password=generate_password_hash(password),
-            role="doctor",
-            department_id=int(dept),
-        )
-    db.session.add(new_doctor)
-    db.session.commit()
-    flash(f"Created new doctor {new_doctor.username}", "success")
-    return redirect("/admin_doctors")
+    if not username or not password:
+        return jsonify({"error": "Missing fields"}), 400
 
+    if User.query.filter_by(username=username).first():
+        return jsonify({"error": "User already exists"}), 400
 
-@app.route("/admin/update_doctor/<int:user_id>", methods=["GET", "POST"])
-def update_doctor(user_id):
-    if "user_id" not in session or session["role"] != "admin":
-        return redirect("/")
-
-    doctor = User.query.filter_by(id=user_id, role="doctor").first()
-
-    if not (doctor):
-        flash("Cannot find doctor", "error")
-        return redirect(f"/admin/update_doctor/{user_id}")
-
-    if request.method == "GET":
-        departments = Department.query.all()
-        return render_template(
-            "update_doctor.html", doctor=doctor, departments=departments
-        )
-
-    new_username = request.form.get("username").strip()
-    new_department_id = request.form.get("department_id")
-
-    doctor.username = new_username
-    doctor.department_id = (
-        int(new_department_id)
-        if new_department_id and new_department_id != "None"
-        else None
+    new_doctor = User(
+        username=username,
+        password=generate_password_hash(password),
+        role="doctor",
+        department_id=dept_id if dept_id else None,
     )
 
+    db.session.add(new_doctor)
     db.session.commit()
-    flash(f"Doctor {doctor.username} updated successfully.")
-    return redirect(url_for("admin_doctors"))
+
+    return jsonify({"msg": "Doctor created"})
 
 
-@app.route("/admin/blacklist_user/<int:user_id>/<string:username>", methods=["POST"])
-def blacklist_user(user_id, username):
-    if "user_id" not in session or session["role"] != "admin":
-        return redirect("/")
-    user = User.query.filter_by(username=username, id=user_id).first()
+@app.route("/admin/update_doctor/<int:user_id>", methods=["PUT"])
+@jwt_required()
+def update_doctor(id):
+    claims = get_jwt()
 
-    if not (user):
-        flash("This user does not exist", "error")
-        return redirect("/admin_dashboard")
+    if claims.get("role") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    doctor = User.query.filter_by(id=id, role="doctor").first()
+
+    if not doctor:
+        return jsonify({"error": "Doctor not found"}), 404
+
+    data = request.get_json()
+
+    doctor.username = data.get("username", doctor.username)
+    doctor.department_id = data.get("department_id")
+
+    db.session.commit()
+
+    return jsonify({"msg": "Doctor updated"})
+
+
+@app.route("/admin/blacklist_user/<int:user_id>", methods=["POST"])
+@jwt_required()
+def blacklist_user(user_id):
+    claims = get_jwt()
+
+    if claims.get("role") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    user = User.query.get(user_id)
+
+    if not user:
+        return jsonify({"error": "User not found"}), 404
 
     user.blacklist = not user.blacklist
     db.session.commit()
 
-    if user.blacklist:
-        flash(f"{username} has been blacklisted.", "success")
-    else:
-        flash(f"Blacklist removed {username}.", "success")
-
-    if user.role == "doctor":
-        return redirect("/admin_doctors")
-    else:
-        return redirect("/admin_patients")
+    return jsonify({"msg": "Updated"})
 
 
 @app.route("/admin/delete_doctor/<int:user_id>", methods=["POST"])
@@ -347,93 +407,119 @@ def delete_patient(user_id):
     return redirect("/admin_patients")
 
 
-@app.route("/admin_departments")
+@app.route("/admin_departments", methods=["GET"])
+@jwt_required()
 def admin_departments():
-    if "user_id" not in session or session["role"] != "admin":
-        return redirect("/")
+    claims = get_jwt()
+
+    if claims.get("role") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
 
     departments = Department.query.all()
     doctors_with_no_dept = User.query.filter_by(
         role="doctor", department_id=None, blacklist=False
     ).all()
-    return render_template(
-        "admin_departments.html",
-        departments=departments,
-        doctors_with_no_dept=doctors_with_no_dept,
+
+    return jsonify(
+        {
+            "departments": [
+                {
+                    "id": d.id,
+                    "name": d.name,
+                    "description": d.description,
+                    "doctors": [
+                        {"id": doc.id, "username": doc.username} for doc in d.doctors
+                    ],
+                }
+                for d in departments
+            ],
+            "doctors": [
+                {"id": doc.id, "username": doc.username} for doc in doctors_with_no_dept
+            ],
+        }
     )
 
 
 @app.route("/admin/add_department", methods=["POST"])
+@jwt_required()
 def add_department():
-    if "user_id" not in session or session["role"] != "admin":
-        return redirect("/")
-    dept_name = request.form.get("dept_name", "")
-    desc = request.form.get("description", "")
-    selected_doctor_ids = request.form.getlist("doctor_ids")
+    claims = get_jwt()
+
+    if claims.get("role") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    data = request.get_json()
+
+    dept_name = data.get("dept_name", "")
+    desc = data.get("description", "")
+    selected_doctor_ids = data.get("doctor_ids", [])
 
     if dept_name == "":
-        flash(f"Please provide a department name", "error")
-        return redirect("/admin_departments")
+        return jsonify({"error": "Name required"}), 400
 
-    dept_exist = Department.query.filter_by(name=dept_name).first()
-
-    if dept_exist:
-        return "A department with this name already exists", 400
+    if Department.query.filter_by(name=dept_name).first():
+        return jsonify({"error": "Department exists"}), 400
 
     new_dept = Department(name=dept_name, description=desc)
     db.session.add(new_dept)
     db.session.commit()
 
-    if selected_doctor_ids:
-        for doc_id in selected_doctor_ids:
-            doctor = User.query.filter_by(id=int(doc_id)).first()
-            if doctor and doctor.role == "doctor":
-                doctor.department_id = new_dept.id
-        db.session.commit()
-
-    flash(f"Department '{dept_name}' created successfully!")
-    return redirect("/admin_departments")
-
-
-@app.route("/admin/update_department/<int:dept_id>", methods=["GET", "POST"])
-def update_department(dept_id):
-    if "user_id" not in session or session["role"] != "admin":
-        return redirect("/")
-
-    dept = Department.query.filter_by(id=dept_id).first()
-
-    if not dept:
-        flash("Could not find Department", "error")
-        return redirect("/admin_departments")
-
-    if request.method == "GET":
-        return render_template("update_department.html", dept=dept)
-
-    dept_name = request.form.get("name", "")
-    dept_description = request.form.get("description", "")
-
-    if dept_name == "":
-        flash("Please provide a department name", "error")
-        return redirect(f"/admin/update_department/{dept_id}")
-
-    dept.name = dept_name
-    dept.description = dept_description
+    for doc_id in selected_doctor_ids:
+        doctor = User.query.get(int(doc_id))
+        if doctor and doctor.role == "doctor":
+            doctor.department_id = new_dept.id
 
     db.session.commit()
-    flash("Department updated successfully!")
-    return redirect(url_for("admin_departments"))
+
+    return jsonify({"msg": "Created"})
+
+
+@app.route("/admin/update_department/<int:dept_id>", methods=["POST"])
+@jwt_required()
+def update_department(dept_id):
+    claims = get_jwt()
+
+    if claims.get("role") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    dept = Department.query.get(dept_id)
+
+    if not dept:
+        return jsonify({"error": "Not found"}), 404
+
+    data = request.get_json()
+
+    dept.name = data.get("name", dept.name)
+    dept.description = data.get("description", dept.description)
+
+    selected_doctor_ids = data.get("doctor_ids", [])
+
+    for doctor in dept.doctors:
+        if doctor.id not in selected_doctor_ids:
+            doctor.department_id = None
+
+    for doc_id in selected_doctor_ids:
+        doctor = User.query.get(doc_id)
+        if doctor and doctor.role == "doctor":
+            doctor.department_id = dept.id
+
+    db.session.commit()
+
+    return jsonify({"msg": "Updated"})
 
 
 @app.route("/admin/delete_department/<int:dept_id>", methods=["POST"])
+@jwt_required()
 def delete_department(dept_id):
-    if "user_id" not in session or session["role"] != "admin":
-        return redirect("/")
+    claims = get_jwt()
 
-    dept = Department.query.filter_by(id=dept_id).first()
+    if claims.get("role") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    dept = Department.query.get(dept_id)
 
     if not dept:
-        flash("Could not find department", "error")
-        return redirect("/admin_departments")
+        return jsonify({"error": "Not found"}), 404
 
     for doctor in dept.doctors:
         doctor.department_id = None
@@ -441,8 +527,7 @@ def delete_department(dept_id):
     db.session.delete(dept)
     db.session.commit()
 
-    flash("Deleted Department Successfully", "success")
-    return redirect("/admin_departments")
+    return jsonify({"msg": "Deleted"})
 
 
 @app.route("/admin_appointments")
@@ -928,72 +1013,79 @@ def view_profile(user_id):
         return redirect(request.path)
 
 
-@app.route("/signup", methods=["GET", "POST"])
+@app.route("/signup", methods=["POST"])
 def signup():
-    if request.method == "GET":
-        if "user_id" in session:
-            return redirect("/")
-        else:
-            return render_template("auth.html", auth="signup")
-    elif request.method == "POST":
-        username = request.form.get("username", "")
-        password = request.form.get("password", "")
+    data = request.get_json()
 
-        if username == "" or password == "":
-            flash("Please provide username and password", "error")
-            return redirect(request.path)
+    username = data.get("username", "").strip()
+    password = data.get("password", "").strip()
 
-        userExist = User.query.filter_by(username=username).first()
+    if not username or not password:
+        return jsonify({"error": "Missing fields"}), 400
 
-        if userExist:
-            flash("User with this username already exists", "error")
-            return redirect(request.path)
+    userExist = User.query.filter_by(username=username).first()
+    if userExist:
+        return jsonify({"error": "User already exists"}), 400
 
-        newUser = User(
-            username=username.strip(),
-            password=generate_password_hash(password.strip()),
-            role="patient",
-        )
-        db.session.add(newUser)
-        db.session.commit()
+    newUser = User(
+        username=username, password=generate_password_hash(password), role="patient"
+    )
+    db.session.add(newUser)
+    db.session.commit()
 
-        session["user_id"] = newUser.id
-        session["username"] = newUser.username
-        session["role"] = newUser.role
+    token = create_access_token(
+        identity=str(newUser.id),
+        additional_claims={"role": newUser.role, "username": newUser.username},
+    )
 
-        return redirect("/")
+    return (
+        jsonify(
+            {
+                "token": token,
+                "user": {
+                    "id": newUser.id,
+                    "username": newUser.username,
+                    "role": newUser.role,
+                },
+            }
+        ),
+        201,
+    )
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    if request.method == "GET":
-        if "user_id" in session:
-            return redirect("/")
-        else:
-            return render_template("auth.html", auth="login")
-    elif request.method == "POST":
-        username = request.form["username"].strip()
-        password = request.form["password"].strip()
+    data = request.get_json()
 
-        user = User.query.filter_by(username=username).first()
-        if user and check_password_hash(user.password, password):
-            if user.blacklist:
-                flash("User has been blacklisted", "error")
-                return redirect("/")
+    username = data.get("username", "").strip()
+    password = data.get("password", "").strip()
 
-            session["user_id"] = user.id
-            session["username"] = user.username
-            session["role"] = user.role
-            return redirect("/")
-        else:
-            flash("Invalid credentials", "error")
-            return redirect(request.path)
+    user = User.query.filter_by(username=username).first()
 
+    if not user or not check_password_hash(user.password, password):
+        return jsonify({"error": "Invalid credentials"}), 401
 
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect("/login")
+    if user.blacklist:
+        return jsonify({"error": "User is blacklisted"}), 403
+
+    token = create_access_token(
+        identity=str(user.id),
+        additional_claims={"role": user.role, "username": user.username},
+    )
+
+    return (
+        jsonify(
+            {
+                "token": token,
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "role": user.role,
+                },
+            }
+        ),
+        201,
+    )
 
 
 if __name__ == "__main__":
