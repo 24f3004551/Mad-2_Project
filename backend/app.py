@@ -571,40 +571,68 @@ def delete_appointment(appt_id):
 
 
 # ---------------------Doctor Routes-----------------------------------------
-@app.route("/doctor_dashboard", methods=["GET", "POST"])
+@app.route("/doctor_dashboard", methods=["GET"])
+@jwt_required()
 def doctor_dashboard():
-    if "user_id" not in session or session["role"] != "doctor":
-        return redirect("/")
+    claims = get_jwt()
 
-    if request.method == "GET":
-        username = session["username"]
-        today = datetime.now().date()
-        doctor = User.query.filter_by(username=username).first()
+    if claims.get("role") != "doctor":
+        return jsonify({"error": "Unauthorized"}), 403
 
-        appointments = Appointment.query.filter(
-            Appointment.doctor_id == doctor.id,
-            Appointment.status.in_(["Booked", "Finished"]),
-        ).all()
+    username = claims.get("username")
+    today = datetime.now().date()
 
-        patient_ids = []
+    doctor = User.query.filter_by(username=username).first()
 
-        for appt in appointments:
-            if appt.patient_id not in patient_ids:
-                patient_ids.append(appt.patient_id)
+    appointments = Appointment.query.filter(
+        Appointment.doctor_id == doctor.id,
+        Appointment.status.in_(["Booked", "Finished"]),
+    ).all()
 
-        assigned_patients = User.query.filter(User.id.in_(patient_ids)).all()
+    patient_ids = []
 
-        daily_appointments = Appointment.query.filter(
-            Appointment.doctor_id == doctor.id,
-            Appointment.date == today,
-            Appointment.status == "Booked",
-        ).all()
-        return render_template(
-            "doctor_dashboard.html",
-            doctor=doctor,
-            daily_appointments=daily_appointments,
-            assigned_patients=assigned_patients,
-        )
+    for appt in appointments:
+        if appt.patient_id not in patient_ids:
+            patient_ids.append(appt.patient_id)
+
+    assigned_patients = User.query.filter(User.id.in_(patient_ids)).all()
+
+    daily_appointments = Appointment.query.filter(
+        Appointment.doctor_id == doctor.id,
+        Appointment.date == today,
+        Appointment.status == "Booked",
+    ).all()
+
+    return jsonify(
+        {
+            "doctor": {"id": doctor.id, "username": doctor.username},
+            "daily_appointments": [
+                {
+                    "id": a.id,
+                    "date": str(a.date),
+                    "slot": a.slot,
+                    "status": a.status,
+                    "patient": a.patient.username,
+                    "has_treatment": True if a.treatment else False,
+                }
+                for a in daily_appointments
+            ],
+            "assigned_patients": [
+                {"id": p.id, "username": p.username} for p in assigned_patients
+            ],
+            "all_appointments": [
+                {
+                    "id": a.id,
+                    "date": str(a.date),
+                    "slot": a.slot,
+                    "status": a.status,
+                    "patient": a.patient.username,
+                    "has_treatment": True if a.treatment else False,
+                }
+                for a in doctor.appointments_as_doctor
+            ],
+        }
+    )
 
 
 @app.route("/doctor_availability", methods=["GET", "POST"])
@@ -758,41 +786,73 @@ def give_treatment(appt_id):
 
 
 # ---------------------Patient Routes----------------------------------------
-@app.route("/patient_dashboard", methods=["GET", "POST"])
+@app.route("/patient_dashboard", methods=["GET"])
+@jwt_required()
 def patient_dashboard():
-    if "user_id" not in session or session["role"] != "patient":
-        return redirect("/")
+    claims = get_jwt()
 
-    if request.method == "GET":
+    if claims.get("role") != "patient":
+        return jsonify({"error": "Unauthorized"}), 403
 
-        username = session["username"]
-        user_id = int(session["user_id"])
-        user = User.query.filter_by(id=user_id, username=username).first()
-        doctors = User.query.filter_by(role="doctor").all()
-        active_doctors = User.query.filter_by(role="doctor", blacklist=False).all()
-        today = datetime.now().date()
-        daily_appointments = Appointment.query.filter(
-            Appointment.patient_id == user.id,
-            Appointment.date == today,
-            Appointment.status == "Booked",
-        ).all()
-        search_term = request.args.get("q", "").strip()
-        if search_term:
-            doctors = User.query.filter_by(role="doctor")
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
 
-            doctors = doctors.join(Department)
+    today = datetime.now().date()
 
-            doctors = doctors.filter(
-                (User.username.like(f"%{search_term}%"))
-                | (Department.name.like(f"%{search_term}%"))
-            ).all()
-        return render_template(
-            "patient_dashboard.html",
-            user=user,
-            doctors=doctors,
-            active_doctors=active_doctors,
-            daily_appointments=daily_appointments,
+    daily_appointments = Appointment.query.filter(
+        Appointment.patient_id == user.id,
+        Appointment.date == today,
+        Appointment.status == "Booked",
+    ).all()
+
+    all_appointments = Appointment.query.filter(Appointment.patient_id == user.id).all()
+
+    search_term = request.args.get("q", "").strip()
+
+    doctors_query = User.query.filter_by(role="doctor", blacklist=False)
+
+    if search_term:
+        doctors_query = doctors_query.outerjoin(Department).filter(
+            (User.username.ilike(f"%{search_term}%"))
+            | (Department.name.ilike(f"%{search_term}%"))
         )
+
+    doctors = doctors_query.all()
+
+    return jsonify(
+        {
+            "daily_appointments": [
+                {
+                    "id": a.id,
+                    "date": a.date.strftime("%Y-%m-%d"),
+                    "slot": a.slot,
+                    "doctor": a.doctor.username if a.doctor else None,
+                    "status": a.status,
+                    "has_treatment": bool(a.treatment),
+                }
+                for a in daily_appointments
+            ],
+            "all_appointments": [
+                {
+                    "id": a.id,
+                    "date": a.date.strftime("%Y-%m-%d"),
+                    "slot": a.slot,
+                    "doctor": a.doctor.username if a.doctor else None,
+                    "status": a.status,
+                    "has_treatment": bool(a.treatment),
+                }
+                for a in all_appointments
+            ],
+            "doctors": [
+                {
+                    "id": d.id,
+                    "username": d.username,
+                    "department": d.department.name if d.department else "No dept",
+                }
+                for d in doctors
+            ],
+        }
+    )
 
 
 @app.route(

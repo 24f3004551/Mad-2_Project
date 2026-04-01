@@ -3,7 +3,7 @@
     <div>
       <nav class="navbar navbar-expand-lg bg-warning">
         <div class="container-fluid">
-          <router-link class="navbar-brand" :to="{ name: 'AdminDashboard' }">
+          <router-link class="navbar-brand" :to="{ name: 'adminDashboard' }">
             Admin Dashboard
           </router-link>
 

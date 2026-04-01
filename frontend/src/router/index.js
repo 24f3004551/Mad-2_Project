@@ -5,9 +5,15 @@ import AdminDashboard from '@/components/Admin/AdminDashboard.vue'
 import AdminDoctors from '@/components/Admin/AdminDoctors.vue'
 import AdminDepartments from '@/components/Admin/AdminDepartments.vue'
 import UpdateDepartment from '@/components/Admin/UpdateDepartment.vue'
+import DoctorView from '@/views/DoctorView.vue'
+import DoctorDashboard from '@/components/Doctor/DoctorDashboard.vue'
+import PatientDashboard from '@/components/Patient/PatientDashboard.vue'
+import PatientView from '@/views/PatientView.vue'
 
 const AdminPatients = { template: '<div class="p-3">Patients Page</div>' }
 const AdminAppointments = { template: '<div class="p-3">Appointments Page</div>' }
+const PatientProfile = { template: '<div class="p-3">Profile Page</div>' }
+const PatientDepartments = { template: '<div class="p-3">Departments Page</div>' }
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -29,6 +35,42 @@ const router = createRouter({
       component: AuthView,
     },
     {
+      path: '/patient',
+      name: 'patient',
+      component: PatientView,
+      meta: { role: 'patient' },
+      children: [
+        {
+          path: '',
+          name: 'patientDashboard',
+          component: PatientDashboard,
+        },
+        {
+          path: 'profile',
+          name: 'patientProfile',
+          component: PatientProfile,
+        },
+        {
+          path: 'departments',
+          name: 'patientDepartments',
+          component: PatientDepartments,
+        },
+      ],
+    },
+    {
+      path: '/doctor',
+      name: 'doctor',
+      component: DoctorView,
+      meta: { role: 'doctor' },
+      children: [
+        {
+          path: '',
+          name: 'doctorDashboard',
+          component: DoctorDashboard,
+        },
+      ],
+    },
+    {
       path: '/admin',
       name: 'admin',
       component: AdminView,
@@ -36,7 +78,7 @@ const router = createRouter({
       children: [
         {
           path: '',
-          name: 'AdminDashboard',
+          name: 'adminDashboard',
           component: AdminDashboard,
         },
         {
