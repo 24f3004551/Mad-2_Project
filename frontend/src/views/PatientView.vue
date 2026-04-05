@@ -9,10 +9,6 @@
         <div class="collapse navbar-collapse">
           <ul class="navbar-nav me-auto">
             <li class="nav-item">
-              <router-link class="nav-link" :to="{ name: 'patientDashboard' }"> Home </router-link>
-            </li>
-
-            <li class="nav-item">
               <router-link class="nav-link" :to="{ name: 'patientProfile' }"> Profile </router-link>
             </li>
 
@@ -32,14 +28,25 @@
 </template>
 
 <script setup>
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-const username = localStorage.getItem('username')
+const username = ref('')
+
+const loadUsername = () => {
+  username.value = localStorage.getItem('username') || 'User'
+}
+
+onMounted(() => {
+  loadUsername()
+  window.addEventListener('usernameUpdated', loadUsername)
+})
 
 const logout = () => {
   localStorage.removeItem('token')
   localStorage.removeItem('role')
+  localStorage.removeItem('username')
   router.push({ name: 'auth' })
 }
 </script>

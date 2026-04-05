@@ -18,9 +18,11 @@ from flask_jwt_extended import (
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta, time
+from zoneinfo import ZoneInfo
 import os
 from dotenv import load_dotenv
 from flask_cors import CORS
+import pytz
 
 load_dotenv()
 
@@ -636,66 +638,68 @@ def doctor_dashboard():
 
 
 @app.route("/doctor_availability", methods=["GET", "POST"])
+@jwt_required()
 def doctor_availability():
+    claims = get_jwt()
 
-    if "user_id" not in session or session["role"] != "doctor":
-        return redirect("/")
+    if claims.get("role") != "doctor":
+        return jsonify({"error": "Unauthorized"}), 403
 
-    today = datetime.now().date()
-    curr_time = datetime.now().time()
-    user_id = int(session["user_id"])
+    username = claims.get("username")
+    doctor = User.query.filter_by(username=username).first()
+
+    if not doctor:
+        return jsonify({"error": "Doctor not found"}), 404
+
+    ist = pytz.timezone("Asia/Kolkata")
+    today = datetime.now(ist).date()
+    current_time = datetime.now(ist)
 
     if request.method == "GET":
         upcoming_days = []
         for i in range(7):
-            upcoming_days.append(today + timedelta(days=i))
+            day = today + timedelta(days=i)
+            upcoming_days.append(str(day))
 
-        records = DoctorAvailability.query.filter_by(doctor_id=user_id).all()
-        doctor = User.query.filter_by(id=user_id).first()
+        records = DoctorAvailability.query.filter_by(doctor_id=doctor.id).all()
 
-        if not doctor:
-            flash("Error getting doctor", "error")
-            return redirect("/doctor_dashboard")
+        availability = {}
 
-        avail = {}
         for r in records:
-            avail[(r.date, r.slot)] = {
+            key = f"{r.date}_{r.slot}"
+            availability[key] = {
                 "available": r.is_available,
                 "booked": r.is_booked,
             }
 
-        TIME_SLOTS = {
-            "slot1": "08:00 AM - 09:00 AM",
-            "slot2": "09:00 AM - 10:00 AM",
-            "slot3": "10:00 AM - 11:00 PM",
-            "slot4": "01:00 PM - 02:00 PM",
-            "slot5": "02:00 PM - 03:00 PM",
-            "slot6": "03:00 PM - 04:00 PM",
-        }
-
-        return render_template(
-            "doctor_slots.html",
-            days=upcoming_days,
-            avail=avail,
-            slots=TIME_SLOTS,
-            curr_time=curr_time,
-            today=today,
-            doctor=doctor,
-            time=time,
+        return jsonify(
+            {
+                "upcoming_days": upcoming_days,
+                "availability": availability,
+                "today": str(today),
+                "current_hour": current_time.hour,
+            }
         )
 
     if request.method == "POST":
+        data = request.get_json()
+        availability_data = data.get("availability", {})
+
         TIME_SLOTS = ["slot1", "slot2", "slot3", "slot4", "slot5", "slot6"]
 
         for i in range(7):
             day = today + timedelta(days=i)
+            day_str = str(day)
 
             for slot in TIME_SLOTS:
-                checkbox_name = f"slot_{day}_{slot}"
-                is_checked = True if request.form.get(checkbox_name) else False
+                key = f"{day_str}_{slot}"
+
+                is_checked = False
+                if key in availability_data:
+                    is_checked = availability_data[key].get("available", False)
 
                 existing = DoctorAvailability.query.filter_by(
-                    doctor_id=user_id, date=day, slot=slot
+                    doctor_id=doctor.id, date=day, slot=slot
                 ).first()
 
                 if existing:
@@ -703,20 +707,20 @@ def doctor_availability():
 
                     if not is_checked:
                         appt = Appointment.query.filter_by(
-                            doctor_id=user_id,
+                            doctor_id=doctor.id,
                             date=day,
                             slot=slot,
                             status="Booked",
                         ).first()
 
-                        if appt and appt.status == "Booked":
+                        if appt:
                             appt.status = "Cancelled"
 
                         existing.is_booked = False
 
                 else:
                     new_slot = DoctorAvailability(
-                        doctor_id=user_id,
+                        doctor_id=doctor.id,
                         date=day,
                         slot=slot,
                         is_available=is_checked,
@@ -724,50 +728,76 @@ def doctor_availability():
                     db.session.add(new_slot)
 
         db.session.commit()
-        flash("Updated Doctor Availability", "success")
-        return redirect(request.path)
+
+        return jsonify({"msg": "Availability updated"})
 
 
-@app.route("/give_treatment/<int:appt_id>", methods=["GET", "POST"])
-def give_treatment(appt_id):
-    if "user_id" not in session or session["role"] != "doctor":
-        return redirect("/")
+@app.route("/treatment/<int:appt_id>", methods=["GET", "POST"])
+@jwt_required()
+def treatment(appt_id):
+    claims = get_jwt()
+    if claims.get("role") != "doctor":
+        return jsonify({"error": "Unauthorized"}), 403
 
-    appt = Appointment.query.filter_by(id=appt_id).first()
+    appt = Appointment.query.get(appt_id)
+
     if not appt:
-        flash("Appointment not found", "error")
-        return redirect(url_for("doctor_dashboard"))
-    past_history = Appointment.query.filter(
-        Appointment.id != appt_id,
-        Appointment.doctor_id == appt.doctor_id,
-        Appointment.patient_id == appt.patient_id,
-        Appointment.status == "Finished",
-    ).all()
+        return jsonify({"error": "Appointment not found"}), 404
+
+    username = claims.get("username")
+    doctor = User.query.filter_by(username=username).first()
+
+    if appt.doctor_id != doctor.id:
+        return jsonify({"error": "Unauthorized access"}), 403
 
     if request.method == "GET":
-        return render_template(
-            "treatment.html", appt=appt, past_history=past_history, doctor=appt.doctor
+        past_history = Appointment.query.filter(
+            Appointment.id != appt_id,
+            Appointment.doctor_id == appt.doctor_id,
+            Appointment.patient_id == appt.patient_id,
+            Appointment.status == "Finished",
+        ).all()
+
+        return jsonify(
+            {
+                "patient": appt.patient.username if appt.patient else "Unknown",
+                "diagnosis": appt.treatment.diagnosis if appt.treatment else "",
+                "prescription": appt.treatment.prescription if appt.treatment else "",
+                "notes": appt.treatment.notes if appt.treatment else "",
+                "history": [
+                    {
+                        "id": p.id,
+                        "date": str(p.date),
+                        "diagnosis": p.treatment.diagnosis if p.treatment else "",
+                        "prescription": p.treatment.prescription if p.treatment else "",
+                        "notes": p.treatment.notes if p.treatment else "",
+                    }
+                    for p in past_history
+                ],
+            }
         )
 
     if request.method == "POST":
-        diagnosis = request.form.get("diagnosis")
-        prescription = request.form.get("prescription")
-        notes = request.form.get("notes")
+        data = request.get_json()
+
+        diagnosis = data.get("diagnosis")
+        prescription = data.get("prescription")
+        notes = data.get("notes")
 
         if not diagnosis:
-            flash("Please provide a diagnosis", "error")
-            return redirect(request.path)
+            return jsonify({"error": "Diagnosis is required"}), 400
 
         existing = Treatment.query.filter_by(appointment_id=appt_id).first()
+
         if existing:
             existing.diagnosis = diagnosis
-            existing.notes = notes
             existing.prescription = prescription
+            existing.notes = notes
         else:
             new_treatment = Treatment(
                 diagnosis=diagnosis,
-                notes=notes,
                 prescription=prescription,
+                notes=notes,
                 appointment_id=appt_id,
             )
             db.session.add(new_treatment)
@@ -777,12 +807,14 @@ def give_treatment(appt_id):
         availability = DoctorAvailability.query.filter_by(
             doctor_id=appt.doctor_id, date=appt.date, slot=appt.slot
         ).first()
+
         if availability:
-            availability.is_booked = False
             availability.is_available = True
+            availability.is_booked = False
+
         db.session.commit()
-        flash("Treatment done!!", "success")
-        return redirect(url_for("doctor_dashboard"))
+
+        return jsonify({"msg": "Treatment saved successfully"})
 
 
 # ---------------------Patient Routes----------------------------------------
@@ -797,7 +829,8 @@ def patient_dashboard():
     user_id = get_jwt_identity()
     user = User.query.get(user_id)
 
-    today = datetime.now().date()
+    ist = pytz.timezone("Asia/Kolkata")
+    today = datetime.now(ist).date()
 
     daily_appointments = Appointment.query.filter(
         Appointment.patient_id == user.id,
@@ -821,6 +854,7 @@ def patient_dashboard():
 
     return jsonify(
         {
+            "user_id": user_id,
             "daily_appointments": [
                 {
                     "id": a.id,
@@ -858,70 +892,59 @@ def patient_dashboard():
 @app.route(
     "/setup_appointment/<int:patient_id>/<int:doctor_id>", methods=["GET", "POST"]
 )
+@jwt_required()
 def setup_appointment(patient_id, doctor_id):
-    if "user_id" not in session:
-        return redirect("/")
+    claims = get_jwt()
+
+    if claims.get("role") != "patient":
+        return jsonify({"error": "Unauthorized"}), 403
 
     patient = User.query.filter_by(id=patient_id, role="patient").first()
-    user = User.query.filter_by(id=patient_id, role="patient").first()
     doctor = User.query.filter_by(id=doctor_id, role="doctor").first()
 
     if not patient or not doctor:
-        flash("Error Getting patient or doctor", "error")
-        return redirect("/patient_dashboard")
+        return jsonify({"error": "Invalid patient or doctor"}), 404
+
+    ist = pytz.timezone("Asia/Kolkata")
+    current_time = datetime.now(ist)
+    today = datetime.now(ist).date()
 
     if request.method == "GET":
         records = DoctorAvailability.query.filter_by(
             doctor_id=doctor_id, is_available=True, is_booked=False
         ).all()
-        today = datetime.now().date()
-        curr_time = datetime.now().time()
+
         grouped = {}
+
         for r in records:
-            if r.date not in grouped:
-                grouped[r.date] = {}
-            grouped[r.date][r.slot] = r.is_available
-        print(grouped)
+            date_str = str(r.date)
 
-        TIME_SLOTS = {
-            "slot1": "08:00 AM - 09:00 AM",
-            "slot2": "09:00 AM - 10:00 AM",
-            "slot3": "10:00 AM - 11:00 PM",
-            "slot4": "01:00 PM - 02:00 PM",
-            "slot5": "02:00 PM - 03:00 PM",
-            "slot6": "03:00 PM - 04:00 PM",
-        }
+            if date_str not in grouped:
+                grouped[date_str] = {}
 
-        return render_template(
-            "setup_appointment.html",
-            grouped=grouped,
-            today=today,
-            curr_time=curr_time,
-            user=user,
-            patient=patient,
-            doctor=doctor,
-            time=time,
-            slots=TIME_SLOTS,
+            grouped[date_str][r.slot] = True
+
+        return jsonify(
+            {"grouped": grouped, "today": str(today), "current_hour": current_time.hour}
         )
 
     if request.method == "POST":
-        selected = request.form.get("selected_slot")
+        data = request.get_json()
+
+        selected = data.get("selected_slot")
+
         if not selected:
-            flash("Please select a slot", "error")
-            return redirect(request.path)
+            return jsonify({"error": "Select a slot"}), 400
 
         date_str, slot = selected.split("|")
         date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
 
-        other_appt = Appointment.query.filter_by(
-            patient_id=patient_id,
-            date=date_obj,
-            slot=slot,
-            status="Booked",
+        other = Appointment.query.filter_by(
+            patient_id=patient_id, date=date_obj, slot=slot, status="Booked"
         ).first()
-        if other_appt:
-            flash("You have another appointment in this slot", "error")
-            return redirect(request.path)
+
+        if other:
+            return jsonify({"error": "Already booked this slot"}), 400
 
         available = DoctorAvailability.query.filter_by(
             doctor_id=doctor_id,
@@ -930,9 +953,9 @@ def setup_appointment(patient_id, doctor_id):
             is_available=True,
             is_booked=False,
         ).first()
+
         if not available:
-            flash("The slot is not longer available", "error")
-            return redirect(request.path)
+            return jsonify({"error": "Slot not available"}), 400
 
         appt = Appointment(
             date=date_obj,
@@ -941,33 +964,66 @@ def setup_appointment(patient_id, doctor_id):
             doctor_id=doctor_id,
             status="Booked",
         )
+
         available.is_booked = True
+
         db.session.add(appt)
         db.session.commit()
 
-        flash("Appointment booked successfully!", "success")
-        return redirect("/patient_dashboard")
+        return jsonify({"msg": "Appointment booked"})
 
 
-@app.route("/view_departments")
+@app.route("/view_departments", methods=["GET"])
+@jwt_required()
 def view_departments():
-    if "user_id" not in session or session["role"] != "patient":
-        return redirect("/")
-    user = User.query.filter_by(id=int(session["user_id"])).first()
-    if not user:
-        flash("Something went wrong", "error")
-        return redirect("/")
+    claims = get_jwt()
+
+    if claims.get("role") != "patient":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+
     departments = Department.query.all()
-    return render_template("view_departments.html", departments=departments, user=user)
+
+    return jsonify(
+        {
+            "user_id": user_id,
+            "departments": [
+                {
+                    "id": d.id,
+                    "name": d.name,
+                    "description": d.description,
+                    "doctors": [
+                        {
+                            "id": doc.id,
+                            "username": doc.username,
+                        }
+                        for doc in d.doctors
+                        if not doc.blacklist
+                    ],
+                }
+                for d in departments
+            ],
+        }
+    )
 
 
 # ---------------------Auth and Common Routes--------------------------------
-@app.route("/view_treatment/<int:appt_id>")
+@app.route("/view_treatment/<int:appt_id>", methods=["GET"])
+@jwt_required()
 def view_treatment(appt_id):
-    if "user_id" not in session or session["role"] == "doctor":
-        return redirect("/")
+    claims = get_jwt()
+    role = claims.get("role")
+
+    if role == "doctor":
+        return jsonify({"error": "Unauthorized"}), 403
 
     appt = Appointment.query.filter_by(id=appt_id).first()
+
+    if not appt:
+        return jsonify({"error": "Appointment not found"}), 404
+
     past_history = Appointment.query.filter(
         Appointment.id != appt_id,
         Appointment.doctor_id == appt.doctor_id,
@@ -975,49 +1031,36 @@ def view_treatment(appt_id):
         Appointment.status == "Finished",
     ).all()
 
-    if not appt:
-        flash("Could not find Appointment", "error")
-        return redirect("/")
-
-    if session["role"] == "patient":
-        return render_template(
-            "view_treatment.html",
-            user=appt.patient,
-            appt=appt,
-            past_history=past_history,
-            layout="patient_dashboard.html",
-        )
-
-    elif session["role"] == "admin":
-        doctors = User.query.filter_by(role="doctor").all()
-        patients = User.query.filter_by(role="patient").all()
-        departments = Department.query.all()
-        appointments = Appointment.query.all()
-
-        return render_template(
-            "view_treatment.html",
-            appt=appt,
-            past_history=past_history,
-            doctors=doctors,
-            patients=patients,
-            departments=departments,
-            appointments=appointments,
-            layout="admin_dashboard.html",
-        )
-
-    else:
-        flash("Unauthorized access", "error")
-        return redirect("/")
+    return jsonify(
+        {
+            "date": appt.date.strftime("%Y-%m-%d"),
+            "patient": appt.patient.username if appt.patient else None,
+            "doctor": appt.doctor.username if appt.doctor else "Doctor not Found",
+            "diagnosis": appt.treatment.diagnosis if appt.treatment else "",
+            "prescription": appt.treatment.prescription if appt.treatment else "",
+            "notes": appt.treatment.notes if appt.treatment else "",
+            "history": [
+                {
+                    "id": p.id,
+                    "date": p.date.strftime("%Y-%m-%d"),
+                    "diagnosis": p.treatment.diagnosis if p.treatment else "",
+                    "prescription": p.treatment.prescription if p.treatment else "",
+                    "notes": p.treatment.notes if p.treatment else "",
+                }
+                for p in past_history
+            ],
+        }
+    )
 
 
 @app.route("/cancel_appointment/<int:appt_id>", methods=["POST"])
+@jwt_required()
 def cancel_appointment(appt_id):
-    if "user_id" not in session:
-        return redirect("/")
     appt = Appointment.query.filter_by(id=appt_id, status="Booked").first()
+
     if not appt:
-        flash("Could not find Appointment", "error")
-        return redirect("/")
+        return jsonify({"error": "Appointment not found"}), 404
+
     slot = DoctorAvailability.query.filter_by(
         date=appt.date,
         slot=appt.slot,
@@ -1027,50 +1070,50 @@ def cancel_appointment(appt_id):
 
     if slot:
         slot.is_booked = False
+
     appt.status = "Cancelled"
-    flash("Cancelled Appointment", "success")
+
     db.session.commit()
-    return redirect("/")
+
+    return jsonify({"msg": "Cancelled successfully"})
 
 
-@app.route("/view_profile/<int:user_id>", methods=["GET", "POST"])
-def view_profile(user_id):
-    if "user_id" not in session:
-        return redirect("/")
+@app.route("/profile", methods=["GET", "POST"])
+@jwt_required()
+def profile():
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
 
-    user = User.query.filter_by(id=user_id).first()
     if not user:
-        flash("User not found", "error")
-        return redirect("/")
+        return jsonify({"error": "User not found"}), 404
 
     if request.method == "GET":
-        return render_template("profile.html", user=user)
+        return jsonify({"username": user.username, "role": user.role})
 
     if request.method == "POST":
-        new_username = request.form.get("username")
-        new_password = request.form.get("password")
+        data = request.get_json()
+
+        new_username = data.get("username")
+        new_password = data.get("password")
 
         changed = False
 
         if new_username and new_username != user.username:
-            user_exists = User.query.filter_by(username=new_username).first()
-            if user_exists:
-                flash("Username already exists", "error")
-                return redirect(request.path)
+            exists = User.query.filter_by(username=new_username).first()
+            if exists:
+                return jsonify({"error": "Username already exists"}), 400
             user.username = new_username
-            session["username"] = new_username
             changed = True
 
-        if new_password and not check_password_hash(user.password, new_password):
+        if new_password:
             user.password = generate_password_hash(new_password)
             changed = True
 
         if changed:
             db.session.commit()
-            flash("Profile updated successfully!", "success")
+            return jsonify({"msg": "Profile updated"})
         else:
-            flash("No changes made", "info")
-        return redirect(request.path)
+            return jsonify({"msg": "No changes made"})
 
 
 @app.route("/signup", methods=["POST"])

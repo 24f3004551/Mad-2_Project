@@ -5,15 +5,20 @@ import AdminDashboard from '@/components/Admin/AdminDashboard.vue'
 import AdminDoctors from '@/components/Admin/AdminDoctors.vue'
 import AdminDepartments from '@/components/Admin/AdminDepartments.vue'
 import UpdateDepartment from '@/components/Admin/UpdateDepartment.vue'
-import DoctorView from '@/views/DoctorView.vue'
+
 import DoctorDashboard from '@/components/Doctor/DoctorDashboard.vue'
 import PatientDashboard from '@/components/Patient/PatientDashboard.vue'
 import PatientView from '@/views/PatientView.vue'
+import DoctorView from '@/views/DoctorView.vue'
+import DoctorAvailability from '@/components/Doctor/DoctorAvailability.vue'
+import Treatment from '@/components/Doctor/Treatment.vue'
+import SetupAppointment from '@/components/Patient/SetupAppointment.vue'
+import PatientDepartments from '@/components/Patient/PatientDepartments.vue'
+import ViewProfile from '@/components/ViewProfile.vue'
+import ViewTreatment from '@/components/ViewTreatment.vue'
 
 const AdminPatients = { template: '<div class="p-3">Patients Page</div>' }
 const AdminAppointments = { template: '<div class="p-3">Appointments Page</div>' }
-const PatientProfile = { template: '<div class="p-3">Profile Page</div>' }
-const PatientDepartments = { template: '<div class="p-3">Departments Page</div>' }
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -29,11 +34,18 @@ const router = createRouter({
         return '/auth'
       },
     },
+    //-------------------------------------Auth/Common-------------------------------------------------------
     {
       path: '/auth',
       name: 'auth',
       component: AuthView,
     },
+    {
+      path: '/view-treatment/:id',
+      name: 'viewTreatment',
+      component: ViewTreatment,
+    },
+    //-------------------------------------Patient----------------------------------------------------
     {
       path: '/patient',
       name: 'patient',
@@ -46,9 +58,14 @@ const router = createRouter({
           component: PatientDashboard,
         },
         {
+          path: 'setup_appointment/:patientId/:doctorId',
+          name: 'setupAppointment',
+          component: SetupAppointment,
+        },
+        {
           path: 'profile',
           name: 'patientProfile',
-          component: PatientProfile,
+          component: ViewProfile,
         },
         {
           path: 'departments',
@@ -57,9 +74,9 @@ const router = createRouter({
         },
       ],
     },
+    //-------------------------------------Doctor----------------------------------------------------
     {
       path: '/doctor',
-      name: 'doctor',
       component: DoctorView,
       meta: { role: 'doctor' },
       children: [
@@ -68,8 +85,19 @@ const router = createRouter({
           name: 'doctorDashboard',
           component: DoctorDashboard,
         },
+        {
+          path: 'availability',
+          name: 'doctorAvailability',
+          component: DoctorAvailability,
+        },
+        {
+          path: 'treatment/:appointmentId',
+          name: 'treatment',
+          component: Treatment,
+        },
       ],
     },
+    //-------------------------------------Admin-------------------------------------------------------
     {
       path: '/admin',
       name: 'admin',

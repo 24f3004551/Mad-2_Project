@@ -11,7 +11,10 @@
         <td>{{ a.status }}</td>
 
         <td>
-          <button v-if="a.has_treatment" class="btn btn-warning">View Treatment</button>
+          <router-link v-if="a.has_treatment" :to="{ name: 'viewTreatment', params: { id: a.id } }">
+            <button class="btn btn-warning">View Treatment</button>
+          </router-link>
+
           <span v-else>None</span>
         </td>
 
@@ -32,6 +35,11 @@
         <td>{{ formatSlot(a.slot) }}</td>
         <td>{{ a.doctor || 'Doctor Deleted' }}</td>
         <td>{{ a.status }}</td>
+        <td>
+          <router-link v-if="a.has_treatment" :to="{ name: 'viewTreatment', params: { id: a.id } }">
+            <button class="btn btn-warning">View</button>
+          </router-link>
+        </td>
       </tr>
     </table>
 
@@ -51,7 +59,7 @@
         <td>{{ d.department }}</td>
 
         <td class="p-1">
-          <button class="btn btn-warning" @click="checkSlots(d.id)">Check Slots</button>
+          <button class="btn btn-warning" @click="checkSlots(d.id, patient_id)">Check Slots</button>
         </td>
       </tr>
     </table>
@@ -61,12 +69,15 @@
 <script setup>
 import axios from 'axios'
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 
 const token = localStorage.getItem('token')
+const router = useRouter()
 
 const dailyAppointments = ref([])
 const allAppointments = ref([])
 const doctors = ref([])
+const patient_id = ref()
 const search = ref('')
 
 const fetchData = async () => {
@@ -78,25 +89,37 @@ const fetchData = async () => {
   dailyAppointments.value = res.data.daily_appointments
   allAppointments.value = res.data.all_appointments
   doctors.value = res.data.doctors
+  patient_id.value = res.data.user_id
 }
+
 const cancelAppointment = async (id) => {
-  await axios.post(
-    `http://localhost:5000/cancel_appointment/${id}`,
-    {},
-    {
-      headers: { Authorization: `Bearer ${token}` },
-    },
-  )
+  try {
+    await axios.post(
+      `http://localhost:5000/cancel_appointment/${id}`,
+      {},
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    )
 
-  fetchData()
+    fetchData()
+  } catch (err) {
+    alert(err.response?.data?.error || 'Error')
+  }
 }
 
-const checkSlots = (doctorId) => {
-  console.log('Make later', doctorId)
+const checkSlots = (doctorId, patientId) => {
+  router.push({
+    name: 'setupAppointment',
+    params: {
+      doctorId: doctorId,
+      patientId: patientId,
+    },
+  })
 }
 
 const formatSlot = (slot) => {
-  const map = {
+  const slot_time = {
     slot1: '8:00 AM - 9:00 AM',
     slot2: '9:00 AM - 10:00 AM',
     slot3: '10:00 AM - 11:00 AM',
@@ -104,7 +127,7 @@ const formatSlot = (slot) => {
     slot5: '2:00 PM - 3:00 PM',
     slot6: '3:00 PM - 4:00 PM',
   }
-  return map[slot] || slot
+  return slot_time[slot] || slot
 }
 
 onMounted(fetchData)

@@ -84,6 +84,9 @@ const addDept = async () => {
       headers: { Authorization: `Bearer ${token}` },
     },
   )
+  dept_name.value = ''
+  description.value = ''
+  selectedDoctors.value = []
 
   fetchData()
 }

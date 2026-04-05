@@ -12,10 +12,15 @@
         <td>{{ a.patient }}</td>
         <td>{{ a.status }}</td>
 
-        <td>
-          <button v-if="a.has_treatment" class="btn btn-warning">View Treatment</button>
-
-          <button v-else class="btn btn-outline-success"></button>
+        <td v-if="a.has_treatment">
+          <router-link :to="{ name: 'treatment', params: { appointmentId: a.id } }"
+            ><button class="btn btn-warning">View Treatment</button></router-link
+          >
+        </td>
+        <td v-else>
+          <router-link :to="{ name: 'treatment', params: { appointmentId: a.id } }"
+            ><button class="btn btn-outline-success">Treat</button></router-link
+          >
         </td>
       </tr>
     </table>
@@ -43,7 +48,9 @@
       </tr>
     </table>
 
-    <button class="btn btn-warning mt-3">Update Availability</button>
+    <router-link :to="{ name: 'doctorAvailability' }">
+      <button class="btn btn-warning mt-3">Update Availability</button>
+    </router-link>
   </div>
 </template>
 
@@ -83,7 +90,7 @@ const fetchData = async () => {
   }
 }
 const formatSlot = (slot) => {
-  const map = {
+  const slot_time = {
     slot1: '8:00 AM - 9:00 AM',
     slot2: '9:00 AM - 10:00 AM',
     slot3: '10:00 AM - 11:00 AM',
@@ -91,7 +98,7 @@ const formatSlot = (slot) => {
     slot5: '2:00 PM - 3:00 PM',
     slot6: '3:00 PM - 4:00 PM',
   }
-  return map[slot] || slot
+  return slot_time[slot] || slot
 }
 
 onMounted(fetchData)
