@@ -45,6 +45,11 @@
         <td>{{ formatSlot(a.slot) }}</td>
         <td>{{ a.patient }}</td>
         <td>{{ a.status }}</td>
+        <td v-if="a.has_treatment">
+          <router-link :to="{ name: 'treatment', params: { appointmentId: a.id } }"
+            ><button class="btn btn-warning">View Treatment</button></router-link
+          >
+        </td>
       </tr>
     </table>
 

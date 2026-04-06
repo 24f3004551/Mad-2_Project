@@ -16,8 +16,8 @@ import SetupAppointment from '@/components/Patient/SetupAppointment.vue'
 import PatientDepartments from '@/components/Patient/PatientDepartments.vue'
 import ViewProfile from '@/components/ViewProfile.vue'
 import ViewTreatment from '@/components/ViewTreatment.vue'
+import AdminPatients from '@/components/Admin/AdminPatients.vue'
 
-const AdminPatients = { template: '<div class="p-3">Patients Page</div>' }
 const AdminAppointments = { template: '<div class="p-3">Appointments Page</div>' }
 
 const router = createRouter({
@@ -45,6 +45,7 @@ const router = createRouter({
       name: 'viewTreatment',
       component: ViewTreatment,
     },
+
     //-------------------------------------Patient----------------------------------------------------
     {
       path: '/patient',
@@ -62,15 +63,16 @@ const router = createRouter({
           name: 'setupAppointment',
           component: SetupAppointment,
         },
-        {
-          path: 'profile',
-          name: 'patientProfile',
-          component: ViewProfile,
-        },
+
         {
           path: 'departments',
           name: 'patientDepartments',
           component: PatientDepartments,
+        },
+        {
+          path: 'profile',
+          name: 'patientProfile',
+          component: ViewProfile,
         },
       ],
     },
@@ -94,6 +96,11 @@ const router = createRouter({
           path: 'treatment/:appointmentId',
           name: 'treatment',
           component: Treatment,
+        },
+        {
+          path: 'profile',
+          name: 'doctorProfile',
+          component: ViewProfile,
         },
       ],
     },

@@ -361,52 +361,66 @@ def delete_doctor(user_id):
 
 
 @app.route("/admin_patients")
+@jwt_required()
 def admin_patients():
-    if "user_id" not in session or session["role"] != "admin":
-        return redirect("/")
+    claims = get_jwt()
+
+    if claims.get("role") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
 
     search_term = request.args.get("q", "").strip()
+
     if search_term:
         patients = User.query.filter(
             User.role == "patient", User.username.like(f"%{search_term}%")
         ).all()
     else:
         patients = User.query.filter_by(role="patient").all()
-    global_patients = User.query.filter_by(role="patient").all()
-    return render_template(
-        "admin_patients.html", patients=patients, global_patients=global_patients
+
+    total_patients = User.query.filter_by(role="patient").count()
+
+    return jsonify(
+        {
+            "patients": [
+                {"id": p.id, "username": p.username, "blacklist": p.blacklist}
+                for p in patients
+            ],
+            "total_patients": total_patients,
+        }
     )
 
 
 @app.route("/admin/delete_patient/<int:user_id>", methods=["POST"])
+@jwt_required()
 def delete_patient(user_id):
-    if "user_id" not in session or session["role"] != "admin":
-        return redirect("/")
+    claims = get_jwt()
+
+    if claims.get("role") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
 
     patient = User.query.filter_by(id=user_id, role="patient").first()
+
     if not patient:
-        flash("Patient not found.", "error")
-        return redirect("/admin_patients")
+        return jsonify({"error": "Patient not found"}), 404
 
     today = datetime.now().date()
+
     upcoming = Appointment.query.filter(
         Appointment.patient_id == patient.id, Appointment.date >= today
     ).all()
+
     for appt in upcoming:
         slot = DoctorAvailability.query.filter_by(
             slot=appt.slot, doctor_id=appt.doctor_id, date=appt.date
         ).first()
+
         if slot and slot.is_booked:
             slot.is_booked = False
 
     db.session.delete(patient)
     db.session.commit()
 
-    flash(
-        f"Patient {patient.username} deleted",
-        "success",
-    )
-    return redirect("/admin_patients")
+    return jsonify({"msg": f"{patient.username} deleted"})
 
 
 @app.route("/admin_departments", methods=["GET"])

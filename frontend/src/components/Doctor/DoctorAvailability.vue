@@ -83,7 +83,7 @@ const isSlotVisible = (day, slotKey) => {
     return true
   }
 
-  if (currentHour.value > slot.hour) {
+  if (currentHour.value >= slot.hour) {
     return false
   }
 
