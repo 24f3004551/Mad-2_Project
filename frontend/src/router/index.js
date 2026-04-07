@@ -17,8 +17,8 @@ import PatientDepartments from '@/components/Patient/PatientDepartments.vue'
 import ViewProfile from '@/components/ViewProfile.vue'
 import ViewTreatment from '@/components/ViewTreatment.vue'
 import AdminPatients from '@/components/Admin/AdminPatients.vue'
-
-const AdminAppointments = { template: '<div class="p-3">Appointments Page</div>' }
+import AdminAppointments from '@/components/Admin/AdminAppointments.vue'
+import EditDoctor from '@/components/Admin/EditDoctor.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -140,6 +140,11 @@ const router = createRouter({
           path: 'departments/update/:id',
           name: 'updateDepartment',
           component: UpdateDepartment,
+        },
+        {
+          path: 'edit-doctor/:id',
+          name: 'editDoctor',
+          component: EditDoctor,
         },
       ],
     },

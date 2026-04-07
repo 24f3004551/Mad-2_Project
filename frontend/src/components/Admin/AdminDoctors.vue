@@ -24,6 +24,9 @@
           <td>{{ index + 1 }}</td>
           <td>{{ doc.username }}</td>
           <td>{{ doc.department || 'Unassigned' }}</td>
+          <td>
+            <button class="btn btn-primary mx-1" @click="goToEdit(doc.id)">Edit</button>
+          </td>
 
           <td>
             <button class="btn btn-warning mx-1" @click="toggleBlacklist(doc)">
@@ -55,6 +58,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import axios from 'axios'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
 
 const doctors = ref([])
 const departments = ref([])
@@ -96,6 +102,10 @@ const deleteDoctor = async (id) => {
   })
 
   fetchDoctors()
+}
+
+const goToEdit = (id) => {
+  router.push(`/admin/edit-doctor/${id}`)
 }
 
 const toggleBlacklist = async (doc) => {

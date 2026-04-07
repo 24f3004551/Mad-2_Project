@@ -6,18 +6,18 @@
 
     <table v-else-if="dailyAppointments.length" class="table">
       <tr v-for="(a, i) in dailyAppointments" :key="a.id">
-        <td>{{ i + 1 }}</td>
-        <td>{{ a.date }}</td>
-        <td>{{ formatSlot(a.slot) }}</td>
-        <td>{{ a.patient }}</td>
-        <td>{{ a.status }}</td>
+        <td class="p-2">{{ i + 1 }}</td>
+        <td class="p-2">{{ a.date }}</td>
+        <td class="p-2">{{ formatSlot(a.slot) }}</td>
+        <td class="p-2">{{ a.patient }}</td>
+        <td class="p-2">{{ a.status }}</td>
 
-        <td v-if="a.has_treatment">
+        <td v-if="a.has_treatment" class="p-2">
           <router-link :to="{ name: 'treatment', params: { appointmentId: a.id } }"
             ><button class="btn btn-warning">View Treatment</button></router-link
           >
         </td>
-        <td v-else>
+        <td v-else class="p-2">
           <router-link :to="{ name: 'treatment', params: { appointmentId: a.id } }"
             ><button class="btn btn-outline-success">Treat</button></router-link
           >
@@ -40,15 +40,29 @@
     <h2>All Appointments</h2>
     <table v-if="allAppointments.length" class="table">
       <tr v-for="(a, i) in allAppointments" :key="a.id">
-        <td>{{ i + 1 }}</td>
-        <td>{{ a.date }}</td>
-        <td>{{ formatSlot(a.slot) }}</td>
-        <td>{{ a.patient }}</td>
-        <td>{{ a.status }}</td>
-        <td v-if="a.has_treatment">
-          <router-link :to="{ name: 'treatment', params: { appointmentId: a.id } }"
-            ><button class="btn btn-warning">View Treatment</button></router-link
+        <td class="p-2">{{ i + 1 }}</td>
+        <td class="p-2">{{ a.date }}</td>
+        <td class="p-2">{{ formatSlot(a.slot) }}</td>
+        <td class="p-2">{{ a.patient }}</td>
+        <td class="p-2">{{ a.status }}</td>
+        <td class="p-2">
+          <router-link
+            v-if="a.status === 'Finished' && a.has_treatment"
+            :to="{ name: 'treatment', params: { appointmentId: a.id } }"
           >
+            <button class="btn btn-warning">View</button>
+          </router-link>
+
+          <router-link
+            v-else-if="a.status === 'Booked' && !a.has_treatment"
+            :to="{ name: 'treatment', params: { appointmentId: a.id } }"
+          >
+            <button class="btn btn-outline-success">Treat</button>
+          </router-link>
+        </td>
+
+        <td v-if="a.status === 'Booked'" class="p-2">
+          <button class="btn btn-danger" @click="cancelAppointment(a.id)">Cancel</button>
         </td>
       </tr>
     </table>
@@ -94,6 +108,23 @@ const fetchData = async () => {
     loading.value = false
   }
 }
+
+const cancelAppointment = async (id) => {
+  try {
+    await axios.post(
+      `http://localhost:5000/cancel_appointment/${id}`,
+      {},
+      {
+        headers: { Authorization: 'Bearer ' + token },
+      },
+    )
+
+    fetchData()
+  } catch (err) {
+    alert(err.response?.data?.error || 'Error')
+  }
+}
+
 const formatSlot = (slot) => {
   const slot_time = {
     slot1: '8:00 AM - 9:00 AM',

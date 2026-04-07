@@ -17,8 +17,7 @@ from flask_jwt_extended import (
 )
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, timedelta, time
-from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
 from flask_cors import CORS
@@ -283,13 +282,13 @@ def add_doctor():
 
 @app.route("/admin/update_doctor/<int:user_id>", methods=["PUT"])
 @jwt_required()
-def update_doctor(id):
+def update_doctor(user_id):
     claims = get_jwt()
 
     if claims.get("role") != "admin":
         return jsonify({"error": "Unauthorized"}), 403
 
-    doctor = User.query.filter_by(id=id, role="doctor").first()
+    doctor = User.query.filter_by(id=user_id, role="doctor").first()
 
     if not doctor:
         return jsonify({"error": "Doctor not found"}), 404
@@ -297,11 +296,19 @@ def update_doctor(id):
     data = request.get_json()
 
     doctor.username = data.get("username", doctor.username)
-    doctor.department_id = data.get("department_id")
+
+    if data.get("password"):
+        doctor.password = generate_password_hash(data["password"])
+
+    doctor.department_id = (
+        data.get("department_id")
+        if data.get("department_id") not in ("", "null")
+        else None
+    )
 
     db.session.commit()
 
-    return jsonify({"msg": "Doctor updated"})
+    return jsonify({"message": "Doctor updated successfully"})
 
 
 @app.route("/admin/blacklist_user/<int:user_id>", methods=["POST"])
@@ -334,7 +341,8 @@ def delete_doctor(user_id):
         flash("Doctor not found.", "error")
         return redirect("/admin_doctors")
 
-    today = datetime.now().date()
+    ist = pytz.timezone("Asia/Kolkata")
+    today = datetime.now(ist).date()
     upcoming = Appointment.query.filter(
         Appointment.doctor_id == doctor.id, Appointment.date >= today
     ).all()
@@ -358,6 +366,27 @@ def delete_doctor(user_id):
         "success",
     )
     return redirect("/admin_doctors")
+
+
+@app.route("/admin/get_doctor/<int:id>", methods=["GET"])
+@jwt_required()
+def get_doctor(id):
+    claims = get_jwt()
+
+    if claims.get("role") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    doctor = User.query.get_or_404(id)
+    departments = Department.query.all()
+
+    return jsonify(
+        {
+            "id": doctor.id,
+            "username": doctor.username,
+            "department_id": doctor.department_id,
+            "departments": [{"id": d.id, "name": d.name} for d in departments],
+        }
+    )
 
 
 @app.route("/admin_patients")
@@ -403,7 +432,8 @@ def delete_patient(user_id):
     if not patient:
         return jsonify({"error": "Patient not found"}), 404
 
-    today = datetime.now().date()
+    ist = pytz.timezone("Asia/Kolkata")
+    today = datetime.now(ist).date()
 
     upcoming = Appointment.query.filter(
         Appointment.patient_id == patient.id, Appointment.date >= today
@@ -547,43 +577,59 @@ def delete_department(dept_id):
 
 
 @app.route("/admin_appointments")
+@jwt_required()
 def admin_appointments():
-    if "user_id" not in session or session["role"] != "admin":
-        return redirect("/")
+    from flask_jwt_extended import get_jwt
+
+    claims = get_jwt()
+    if claims.get("role") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
 
     appointments = Appointment.query.all()
-    patients = User.query.filter_by(role="patient").all()
-    doctors = User.query.filter_by(role="doctor").all()
-    today = datetime.today().isoformat()
-    return render_template(
-        "admin_appointments.html",
-        appointments=appointments,
-        doctors=doctors,
-        patients=patients,
-        today=today,
+
+    return jsonify(
+        {
+            "appointments": [
+                {
+                    "id": a.id,
+                    "date": str(a.date),
+                    "slot": a.slot,
+                    "patient": a.patient.username,
+                    "doctor": a.doctor.username if a.doctor else None,
+                    "status": a.status,
+                    "has_treatment": True if a.treatment else False,
+                }
+                for a in appointments
+            ]
+        }
     )
 
 
 @app.route("/admin/delete_appointment/<int:appt_id>", methods=["POST"])
+@jwt_required()
 def delete_appointment(appt_id):
-    if "user_id" not in session or session["role"] != "admin":
-        return redirect("/")
+    from flask_jwt_extended import get_jwt
+
+    claims = get_jwt()
+    if claims.get("role") != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
+
     appt = Appointment.query.filter_by(id=appt_id).first()
 
     if not appt:
-        flash("Could not find appointment", "error")
-        return redirect("/admin_appointments")
+        return jsonify({"error": "Appointment not found"}), 404
 
     slot = DoctorAvailability.query.filter_by(
         doctor_id=appt.doctor_id, date=appt.date, slot=appt.slot
     ).first()
+
     if slot:
         slot.is_booked = False
 
     db.session.delete(appt)
     db.session.commit()
-    flash("Appointment deleted successfully.", "success")
-    return redirect("/admin_appointments")
+
+    return jsonify({"msg": "Appointment deleted"})
 
 
 # ---------------------Doctor Routes-----------------------------------------
@@ -596,7 +642,8 @@ def doctor_dashboard():
         return jsonify({"error": "Unauthorized"}), 403
 
     username = claims.get("username")
-    today = datetime.now().date()
+    ist = pytz.timezone("Asia/Kolkata")
+    today = datetime.now(ist).date()
 
     doctor = User.query.filter_by(username=username).first()
 

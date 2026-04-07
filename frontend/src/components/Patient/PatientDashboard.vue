@@ -30,15 +30,18 @@
 
     <table v-if="allAppointments.length" class="table">
       <tr v-for="(a, i) in allAppointments" :key="a.id">
-        <td>{{ i + 1 }}</td>
-        <td>{{ a.date }}</td>
-        <td>{{ formatSlot(a.slot) }}</td>
-        <td>{{ a.doctor || 'Doctor Deleted' }}</td>
-        <td>{{ a.status }}</td>
-        <td>
+        <td class="p-2">{{ i + 1 }}</td>
+        <td class="p-2">{{ a.date }}</td>
+        <td class="p-2">{{ formatSlot(a.slot) }}</td>
+        <td class="p-2">{{ a.doctor || 'Doctor Deleted' }}</td>
+        <td class="p-2">{{ a.status }}</td>
+        <td class="p-2">
           <router-link v-if="a.has_treatment" :to="{ name: 'viewTreatment', params: { id: a.id } }">
             <button class="btn btn-warning">View</button>
           </router-link>
+        </td>
+        <td v-if="a.status === 'Booked'" class="p-2">
+          <button class="btn btn-danger" @click="cancelAppointment(a.id)">Cancel</button>
         </td>
       </tr>
     </table>
