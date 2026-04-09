@@ -97,11 +97,23 @@ const addDoctor = async () => {
 }
 
 const deleteDoctor = async (id) => {
-  await axios.delete(`http://localhost:5000/admin/delete_doctor/${id}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
+  if (!confirm('Are you sure you want to delete this doctor?')) return
 
-  fetchDoctors()
+  try {
+    const token = localStorage.getItem('token')
+
+    const res = await axios.delete(`http://localhost:5000/admin/delete_doctor/${id}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+
+    alert(res.data.message)
+    fetchDoctors()
+  } catch (err) {
+    console.error(err)
+    alert(err.response?.data?.error || 'Something went wrong')
+  }
 }
 
 const goToEdit = (id) => {

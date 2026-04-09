@@ -22,6 +22,7 @@ import os
 from dotenv import load_dotenv
 from flask_cors import CORS
 import pytz
+from flask_caching import Cache
 
 load_dotenv()
 
@@ -30,6 +31,10 @@ CORS(app)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///hospital.db"
 # app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
 app.config["JWT_SECRET_KEY"] = "mypersonaljwtsecretkeyformyhospitalapplication"
+app.config["CACHE_TYPE"] = "RedisCache"
+app.config["CACHE_REDIS_URL"] = "redis://localhost:6379/0"
+
+cache = Cache(app)
 jwt = JWTManager(app)
 db = SQLAlchemy(app)
 
@@ -147,6 +152,7 @@ class Treatment(db.Model):
 # --------------------Admin Routes-------------------------------------------
 @app.route("/admin_dashboard", methods=["GET"])
 @jwt_required()
+@cache.cached(timeout=60)
 def admin_dashboard():
     claims = get_jwt()
 
@@ -208,6 +214,7 @@ def admin_dashboard():
 
 @app.route("/admin_doctors", methods=["GET"])
 @jwt_required()
+@cache.cached(timeout=60, query_string=True)
 def admin_doctors():
     claims = get_jwt()
 
@@ -276,6 +283,7 @@ def add_doctor():
 
     db.session.add(new_doctor)
     db.session.commit()
+    cache.clear()
 
     return jsonify({"msg": "Doctor created"})
 
@@ -307,7 +315,7 @@ def update_doctor(user_id):
     )
 
     db.session.commit()
-
+    cache.clear()
     return jsonify({"message": "Doctor updated successfully"})
 
 
@@ -330,22 +338,27 @@ def blacklist_user(user_id):
     return jsonify({"msg": "Updated"})
 
 
-@app.route("/admin/delete_doctor/<int:user_id>", methods=["POST"])
+@app.route("/admin/delete_doctor/<int:user_id>", methods=["DELETE"])
+@jwt_required()
 def delete_doctor(user_id):
-    if "user_id" not in session or session["role"] != "admin":
-        return redirect("/")
+    current_user_id = get_jwt_identity()
+    current_user = User.query.get(current_user_id)
+
+    if not current_user or current_user.role != "admin":
+        return jsonify({"error": "Unauthorized"}), 403
 
     doctor = User.query.filter_by(id=user_id, role="doctor").first()
 
     if not doctor:
-        flash("Doctor not found.", "error")
-        return redirect("/admin_doctors")
+        return jsonify({"error": "Doctor not found"}), 404
 
     ist = pytz.timezone("Asia/Kolkata")
     today = datetime.now(ist).date()
+
     upcoming = Appointment.query.filter(
         Appointment.doctor_id == doctor.id, Appointment.date >= today
     ).all()
+
     past = Appointment.query.filter(
         Appointment.doctor_id == doctor.id, Appointment.date < today
     ).all()
@@ -360,12 +373,8 @@ def delete_doctor(user_id):
 
     db.session.delete(doctor)
     db.session.commit()
-
-    flash(
-        f"Doctor {doctor.username} deleted",
-        "success",
-    )
-    return redirect("/admin_doctors")
+    cache.clear()
+    return jsonify({"message": f"Doctor {doctor.username} deleted successfully"}), 200
 
 
 @app.route("/admin/get_doctor/<int:id>", methods=["GET"])
@@ -391,6 +400,7 @@ def get_doctor(id):
 
 @app.route("/admin_patients")
 @jwt_required()
+@cache.cached(timeout=60, query_string=True)
 def admin_patients():
     claims = get_jwt()
 
@@ -449,12 +459,13 @@ def delete_patient(user_id):
 
     db.session.delete(patient)
     db.session.commit()
-
+    cache.clear()
     return jsonify({"msg": f"{patient.username} deleted"})
 
 
 @app.route("/admin_departments", methods=["GET"])
 @jwt_required()
+@cache.cached(timeout=120)
 def admin_departments():
     claims = get_jwt()
 
@@ -516,7 +527,7 @@ def add_department():
             doctor.department_id = new_dept.id
 
     db.session.commit()
-
+    cache.clear()
     return jsonify({"msg": "Created"})
 
 
@@ -550,7 +561,7 @@ def update_department(dept_id):
             doctor.department_id = dept.id
 
     db.session.commit()
-
+    cache.clear()
     return jsonify({"msg": "Updated"})
 
 
@@ -572,7 +583,7 @@ def delete_department(dept_id):
 
     db.session.delete(dept)
     db.session.commit()
-
+    cache.clear()
     return jsonify({"msg": "Deleted"})
 
 
@@ -628,7 +639,7 @@ def delete_appointment(appt_id):
 
     db.session.delete(appt)
     db.session.commit()
-
+    cache.clear()
     return jsonify({"msg": "Appointment deleted"})
 
 
@@ -789,7 +800,7 @@ def doctor_availability():
                     db.session.add(new_slot)
 
         db.session.commit()
-
+        cache.clear()
         return jsonify({"msg": "Availability updated"})
 
 
@@ -874,13 +885,14 @@ def treatment(appt_id):
             availability.is_booked = False
 
         db.session.commit()
-
+        cache.clear()
         return jsonify({"msg": "Treatment saved successfully"})
 
 
 # ---------------------Patient Routes----------------------------------------
 @app.route("/patient_dashboard", methods=["GET"])
 @jwt_required()
+@cache.cached(timeout=60, query_string=True)
 def patient_dashboard():
     claims = get_jwt()
 
@@ -1030,7 +1042,7 @@ def setup_appointment(patient_id, doctor_id):
 
         db.session.add(appt)
         db.session.commit()
-
+        cache.clear()
         return jsonify({"msg": "Appointment booked"})
 
 
@@ -1135,7 +1147,7 @@ def cancel_appointment(appt_id):
     appt.status = "Cancelled"
 
     db.session.commit()
-
+    cache.clear()
     return jsonify({"msg": "Cancelled successfully"})
 
 
