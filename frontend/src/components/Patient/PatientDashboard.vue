@@ -1,5 +1,8 @@
 <template>
   <div class="container mt-3">
+    <button class="btn btn-primary" @click="exportCSV" :disabled="exporting">
+      {{ exporting ? 'Exporting...' : 'Export My Report (CSV)' }}
+    </button>
     <h2>Today's Appointments</h2>
 
     <table v-if="dailyAppointments.length" class="table">
@@ -82,6 +85,7 @@ const allAppointments = ref([])
 const doctors = ref([])
 const patient_id = ref()
 const search = ref('')
+const exporting = ref(false)
 
 const fetchData = async () => {
   const res = await axios.get('http://localhost:5000/patient_dashboard', {
@@ -119,6 +123,28 @@ const checkSlots = (doctorId, patientId) => {
       patientId: patientId,
     },
   })
+}
+
+const exportCSV = async () => {
+  exporting.value = true
+
+  try {
+    const res = await axios.post(
+      'http://localhost:5000/export_csv',
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      },
+    )
+
+    alert(res.data.msg || 'CSV export started!')
+  } catch (err) {
+    alert(err.response?.data?.error || 'Export failed')
+  } finally {
+    exporting.value = false
+  }
 }
 
 const formatSlot = (slot) => {

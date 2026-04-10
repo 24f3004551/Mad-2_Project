@@ -1,11 +1,6 @@
 from flask import (
     Flask,
-    render_template,
     request,
-    redirect,
-    session,
-    flash,
-    url_for,
     jsonify,
 )
 from flask_jwt_extended import (
@@ -18,18 +13,17 @@ from flask_jwt_extended import (
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
-import os
 from dotenv import load_dotenv
 from flask_cors import CORS
 import pytz
 from flask_caching import Cache
+
 
 load_dotenv()
 
 app = Flask(__name__, template_folder="templates")
 CORS(app)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///hospital.db"
-# app.config["SECRET_KEY"] = os.getenv("SECRET_KEY")
 app.config["JWT_SECRET_KEY"] = "mypersonaljwtsecretkeyformyhospitalapplication"
 app.config["CACHE_TYPE"] = "RedisCache"
 app.config["CACHE_REDIS_URL"] = "redis://localhost:6379/0"
@@ -39,7 +33,7 @@ jwt = JWTManager(app)
 db = SQLAlchemy(app)
 
 
-# ----------------------Models----------------------------------
+# Models
 class User(db.Model):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
@@ -91,6 +85,7 @@ class Department(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), unique=True, nullable=False)
     description = db.Column(db.Text, nullable=True)
+
     doctors = db.relationship("User", back_populates="department")
 
 
@@ -130,26 +125,7 @@ class Treatment(db.Model):
     appointment = db.relationship("Appointment", back_populates="treatment")
 
 
-# ---------------------Routes-----------------------------------
-# @app.route("/")
-# def dashboard():
-#     if "user_id" not in session:
-#         return redirect("/login")
-
-#     role = session.get("role")
-
-#     if role == "admin":
-#         return redirect("/admin_dashboard")
-#     elif role == "patient":
-#         return redirect(url_for("patient_dashboard"))
-#     elif role == "doctor":
-#         return redirect("/doctor_dashboard")
-#     else:
-#         session.clear()
-#         return redirect("/login")
-
-
-# --------------------Admin Routes-------------------------------------------
+# Admin Routes
 @app.route("/admin_dashboard", methods=["GET"])
 @jwt_required()
 @cache.cached(timeout=60)
@@ -334,6 +310,7 @@ def blacklist_user(user_id):
 
     user.blacklist = not user.blacklist
     db.session.commit()
+    cache.clear()
 
     return jsonify({"msg": "Updated"})
 
@@ -643,7 +620,7 @@ def delete_appointment(appt_id):
     return jsonify({"msg": "Appointment deleted"})
 
 
-# ---------------------Doctor Routes-----------------------------------------
+# Doctor Routes
 @app.route("/doctor_dashboard", methods=["GET"])
 @jwt_required()
 def doctor_dashboard():
@@ -889,7 +866,7 @@ def treatment(appt_id):
         return jsonify({"msg": "Treatment saved successfully"})
 
 
-# ---------------------Patient Routes----------------------------------------
+# Patient Routes
 @app.route("/patient_dashboard", methods=["GET"])
 @jwt_required()
 @cache.cached(timeout=60, query_string=True)
@@ -1082,7 +1059,23 @@ def view_departments():
     )
 
 
-# ---------------------Auth and Common Routes--------------------------------
+@app.route("/export_csv", methods=["POST"])
+@jwt_required()
+def trigger_export_csv():
+    user_id = get_jwt_identity()
+    claims = get_jwt()
+
+    if claims.get("role") != "patient":
+        return jsonify({"error": "Unauthorized"}), 403
+
+    from tasks import export_csv
+
+    export_csv.delay(user_id)
+
+    return jsonify({"msg": "CSV export started. You will receive email shortly."})
+
+
+# Auth and Common Routes
 @app.route("/view_treatment/<int:appt_id>", methods=["GET"])
 @jwt_required()
 def view_treatment(appt_id):

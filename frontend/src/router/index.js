@@ -34,7 +34,7 @@ const router = createRouter({
         return '/auth'
       },
     },
-    //-------------------------------------Auth/Common-------------------------------------------------------
+    // Auth/Common
     {
       path: '/auth',
       name: 'auth',
@@ -46,7 +46,7 @@ const router = createRouter({
       component: ViewTreatment,
     },
 
-    //-------------------------------------Patient----------------------------------------------------
+    // Patient
     {
       path: '/patient',
       name: 'patient',
@@ -76,7 +76,7 @@ const router = createRouter({
         },
       ],
     },
-    //-------------------------------------Doctor----------------------------------------------------
+    // Doctor
     {
       path: '/doctor',
       component: DoctorView,
@@ -104,7 +104,7 @@ const router = createRouter({
         },
       ],
     },
-    //-------------------------------------Admin-------------------------------------------------------
+    // Admin
     {
       path: '/admin',
       name: 'admin',
